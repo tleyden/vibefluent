@@ -1,6 +1,7 @@
 from onboarding import load_onboarding_data, run_onboarding
-from conversation import TravelConversationAgent
+from conversation import ConversationAgent
 from dotenv import load_dotenv
+
 
 def run_conversation_loop(onboarding_data):
     """Run the main travel conversation loop."""
@@ -10,7 +11,7 @@ def run_conversation_loop(onboarding_data):
     print("=" * 60 + "\n")
 
     # Initialize conversation agent
-    conversation_agent = TravelConversationAgent(onboarding_data)
+    conversation_agent = ConversationAgent(onboarding_data)
 
     # Start with initial question
     initial_question = conversation_agent.generate_initial_question()
@@ -49,7 +50,6 @@ def run_conversation_loop(onboarding_data):
 
 
 def main():
-    
     load_dotenv()
 
     # Check if user has completed onboarding

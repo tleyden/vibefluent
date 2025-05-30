@@ -10,7 +10,7 @@ class ConversationResponse(BaseModel):
     follow_up_question: str
 
 
-class TravelConversationAgent:
+class ConversationAgent:
     def __init__(self, onboarding_data: OnboardingData):
         self.onboarding_data = onboarding_data
         self.conversation_history: List[str] = []
