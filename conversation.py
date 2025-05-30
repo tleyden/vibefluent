@@ -70,6 +70,7 @@ class ConversationAgent:
             2. Is appropriate for their {self.onboarding_data.target_language_level} level
             3. Will lead to an interesting conversation
             4. Is open-ended and encourages them to share their thoughts/experiences
+            5. Keep things fairly brief, because users get overwhelmed with long messages
             
             Return only the question text, nothing else.
             """,
@@ -116,10 +117,10 @@ class ConversationAgent:
         {recent_context}
         
         Please respond in a way that:
-        1. Acknowledges what they shared about travel
-        2. Keeps the conversation engaging and travel-focused
+        1. Acknowledges what they shared 
+        2. Keeps the conversation engaging
         3. Helps them practice their {self.onboarding_data.target_language}
-        4. Shows genuine interest in their travel thoughts/experiences
+        4. Shows genuine interest in their thoughts/experiences
         5. Asks a follow-up question to continue the conversation naturally
         
         Remember their level is {self.onboarding_data.target_language_level}, so adjust your language complexity accordingly.
