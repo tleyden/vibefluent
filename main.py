@@ -4,9 +4,9 @@ from dotenv import load_dotenv
 
 
 def run_conversation_loop(onboarding_data):
-    """Run the main travel conversation loop."""
+    """Run the main conversation loop."""
     print("\n" + "=" * 60)
-    print("🌍 Welcome to your travel conversation practice! 🌍")
+    print("🌍 Welcome to your conversation practice! 🌍")
     print("Type 'quit' or 'exit' to end the conversation")
     print("=" * 60 + "\n")
 
@@ -31,7 +31,7 @@ def run_conversation_loop(onboarding_data):
 
             # Skip empty inputs
             if not user_input:
-                print("Please share your thoughts about travel!\n")
+                print("Sorry, I didn't get anything.  Try again!\n")
                 continue
 
             # Get AI response
@@ -46,7 +46,7 @@ def run_conversation_loop(onboarding_data):
             break
         except Exception as e:
             print(f"\nSorry, I encountered an error: {e}")
-            print("Let's keep chatting! What would you like to share about travel?\n")
+            print("Let's keep chatting! What would you like to chat about?\n")
 
 
 def main():
