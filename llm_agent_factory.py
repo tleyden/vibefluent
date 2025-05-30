@@ -5,7 +5,6 @@ from pydantic_ai.models.openai import OpenAIModel
 from pydantic_ai.models.anthropic import AnthropicModel
 from constants import DEFAULT_MODEL, DEFAULT_FALLBACK_MODEL, DEFAULT_REASONING_MODEL
 
-# T = TypeVar("T", bound=BaseModel)
 T = TypeVar("T")
 
 
