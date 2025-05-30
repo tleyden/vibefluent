@@ -2,7 +2,6 @@ from pydantic import BaseModel
 from typing import List
 from llm_agent_factory import LLMAgentFactory
 from onboarding import OnboardingData
-import random
 
 
 class ConversationResponse(BaseModel):
@@ -52,22 +51,44 @@ class ConversationAgent:
         """
 
     def generate_initial_question(self) -> str:
-        """Generate a random travel-related question to start the conversation."""
-        travel_questions = [
-            "What's the most interesting place you've ever visited or would like to visit?",
-            "If you could travel anywhere in the world right now, where would you go and why?",
-            "What's your favorite type of accommodation when traveling - hotels, hostels, or something else?",
-            "Do you prefer planning every detail of a trip or being spontaneous? Tell me about your travel style!",
-            "What's the best local food you've tried while traveling, or what would you most like to try?",
-            "Would you rather explore a bustling city or relax in nature during your travels?",
-            "What's one travel experience that's on your bucket list?",
-            "Do you prefer traveling solo, with friends, or with family? What do you enjoy about that style?",
-            "What's the longest trip you've ever taken or would like to take?",
-            "If you could learn about any culture through travel, which would fascinate you most?",
-        ]
+        """Generate a personalized question using the LLM based on user's interests."""
 
-        question = random.choice(travel_questions)
-        return f"Hello {self.onboarding_data.name}! Let's practice your {self.onboarding_data.target_language} by chatting about travel. {question}"
+        # Create a simple agent for generating initial questions
+        question_agent = self.factory.create_agent(
+            result_type=str,
+            system_prompt=f"""
+            You are helping {self.onboarding_data.name} practice {self.onboarding_data.target_language}.
+            Generate an engaging conversation starter question that relates to their interests.
+            
+            User Profile:
+            - Learning: {self.onboarding_data.target_language} (Level: {self.onboarding_data.target_language_level})
+            - Interests: {self.onboarding_data.conversation_interests}
+            - Learning Goal: {self.onboarding_data.reason_for_learning}
+            
+            Create a friendly, engaging question that:
+            1. Relates to their stated interests: {self.onboarding_data.conversation_interests}
+            2. Is appropriate for their {self.onboarding_data.target_language_level} level
+            3. Will lead to an interesting conversation
+            4. Is open-ended and encourages them to share their thoughts/experiences
+            
+            Return only the question text, nothing else.
+            """,
+        )
+
+        prompt = f"""
+        Generate a conversation starter question for {self.onboarding_data.name} that relates to their interests: {self.onboarding_data.conversation_interests}.
+        
+        The question should be engaging, open-ended, and help them practice their {self.onboarding_data.target_language}.
+        Make it personal and interesting based on what they've shared about their interests.
+        """
+
+        try:
+            result = question_agent.run_sync(prompt)
+            generated_question = result.data.strip()
+            return f"Hello {self.onboarding_data.name}! Let's practice your {self.onboarding_data.target_language}. {generated_question}"
+        except Exception:
+            # Fallback to a generic question if LLM fails
+            return f"Hello {self.onboarding_data.name}! Let's practice your {self.onboarding_data.target_language} by talking about {self.onboarding_data.conversation_interests}. What would you like to share about this topic?"
 
     def add_to_history(self, user_message: str):
         """Add user message to conversation history, maintaining max limit."""
