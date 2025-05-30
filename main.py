@@ -1,7 +1,57 @@
 from onboarding import load_onboarding_data, run_onboarding
+from conversation import TravelConversationAgent
+from dotenv import load_dotenv
+
+def run_conversation_loop(onboarding_data):
+    """Run the main travel conversation loop."""
+    print("\n" + "=" * 60)
+    print("🌍 Welcome to your travel conversation practice! 🌍")
+    print("Type 'quit' or 'exit' to end the conversation")
+    print("=" * 60 + "\n")
+
+    # Initialize conversation agent
+    conversation_agent = TravelConversationAgent(onboarding_data)
+
+    # Start with initial question
+    initial_question = conversation_agent.generate_initial_question()
+    print(f"VibeFluent: {initial_question}\n")
+
+    while True:
+        try:
+            # Get user input
+            user_input = input("You: ").strip()
+
+            # Check for exit commands
+            if user_input.lower() in ["quit", "exit", "q"]:
+                print(
+                    f"\nGoodbye, {onboarding_data.name}! Keep practicing your {onboarding_data.target_language}! 🎉"
+                )
+                break
+
+            # Skip empty inputs
+            if not user_input:
+                print("Please share your thoughts about travel!\n")
+                continue
+
+            # Get AI response
+            print("\nThinking... 🤔")
+            response = conversation_agent.get_response(user_input)
+
+            print(f"\nVibeFluent: {response.assistant_message}")
+            print(f"\nVibeFluent: {response.follow_up_question}\n")
+
+        except KeyboardInterrupt:
+            print(f"\n\nGoodbye, {onboarding_data.name}! Thanks for practicing! 👋")
+            break
+        except Exception as e:
+            print(f"\nSorry, I encountered an error: {e}")
+            print("Let's keep chatting! What would you like to share about travel?\n")
 
 
 def main():
+    
+    load_dotenv()
+
     # Check if user has completed onboarding
     onboarding_data = load_onboarding_data()
 
@@ -14,8 +64,8 @@ def main():
         print(f"Welcome back, {onboarding_data.name}!")
         print(f"Continuing your {onboarding_data.target_language} learning journey...")
 
-    # TODO: Add main application logic here
-    print("VibeFluent main application would start here...")
+    # Start the conversation loop
+    run_conversation_loop(onboarding_data)
 
 
 if __name__ == "__main__":
