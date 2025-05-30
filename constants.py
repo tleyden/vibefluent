@@ -1,0 +1,3 @@
+DEFAULT_MODEL = "claude-3-7-sonnet-latest"
+DEFAULT_FALLBACK_MODEL = "gpt-4o"
+DEFAULT_REASONING_MODEL = "o1"
