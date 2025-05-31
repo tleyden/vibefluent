@@ -331,13 +331,22 @@ def main():
     # Initialize logfire
     LOGFIRE_API_KEY = os.environ.get("LOGFIRE_API_KEY", "")
     if LOGFIRE_API_KEY:
-        logfire.configure(
-            token=LOGFIRE_API_KEY,
-            service_name="vibefluent",
-            environment="development",
-            console=False,
-        )
-        logfire.info("VibeFluent application started successfully")
+        service_name = "vibefluent"
+        environment = "development"
+        if MODE == "REALTIME_AUDIO":
+            logfire.configure(
+                token=LOGFIRE_API_KEY,
+                service_name=service_name,
+                environment=environment,
+            )
+        else:
+            logfire.configure(
+                token=LOGFIRE_API_KEY,
+                service_name=service_name,
+                environment=environment,
+                console=False,
+            )
+            logfire.info("VibeFluent application started successfully")
 
     # Check if user has completed onboarding
     onboarding_data = load_onboarding_data()
