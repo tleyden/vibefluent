@@ -12,7 +12,7 @@ from models import ConversationResponse
 from database import get_database
 from prompt_manager import get_prompt_manager
 import logfire
-
+from typing import Optional
 
 class RealtimeAudioConversationAgent:
     def __init__(self, onboarding_data: OnboardingData):
@@ -29,12 +29,12 @@ class RealtimeAudioConversationAgent:
         self.channels = 1
 
         # WebSocket and audio state
-        self.websocket = None
+        self.websocket: Optional[websockets.WebSocketClientProtocol] = None
         self.audio = pyaudio.PyAudio()
         self.is_recording = False
         self.is_playing = False
-        self.audio_queue = queue.Queue()
-        self.response_queue = queue.Queue()
+        self.audio_queue: queue.Queue = queue.Queue()
+        self.response_queue: queue.Queue = queue.Queue()
 
         # Track response state for interruption
         self.has_active_response = False
@@ -120,6 +120,11 @@ class RealtimeAudioConversationAgent:
                 "max_response_output_tokens": 4096,
             },
         }
+
+        if not self.websocket or self.websocket.closed:
+            raise RuntimeError(
+                "WebSocket connection is not open. Cannot configure session."
+            )
 
         await self.websocket.send(json.dumps(config))
         logfire.info("Session configured for realtime audio")
@@ -357,7 +362,7 @@ class RealtimeAudioConversationAgent:
 
     async def send_text_message(self, message: str):
         """Send a text message to the conversation (useful for commands)."""
-        if self.websocket and not self.websocket.closed:
+        if self.websocket is not None and not self.websocket.closed:
             text_message = {
                 "type": "conversation.item.create",
                 "item": {
