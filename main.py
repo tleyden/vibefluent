@@ -196,6 +196,7 @@ def run_conversation_loop(onboarding_data):
                     onboarding_data=onboarding_data,
                     vocab_words=response.vocab_words_user_asked_about,
                 )
+                print(f"New vocabulary words saved {', '.join(str(word) for word in response.vocab_words_user_asked_about)}")
 
             print(f"\nVibeFluent: {response.assistant_message}")
             print(f"\nVibeFluent: {response.follow_up_question}\n")
@@ -338,6 +339,7 @@ def main():
                 token=LOGFIRE_API_KEY,
                 service_name=service_name,
                 environment=environment,
+                console=False,
             )
         else:
             logfire.configure(

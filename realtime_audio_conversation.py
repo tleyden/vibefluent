@@ -91,9 +91,12 @@ class RealtimeAudioConversationAgent:
 
     async def _connect_websocket(self):
         """Connect to OpenAI Realtime API via WebSocket."""
-        url = (
-            "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01"
-        )
+        
+        # url = (
+        #     "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01"
+        # )
+
+        url = "wss://api.openai.com/v1/realtime?model=gpt-4o-mini-realtime-preview-2024-12-17"
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "OpenAI-Beta": "realtime=v1",
@@ -153,7 +156,7 @@ class RealtimeAudioConversationAgent:
                 },
                 "turn_detection": {
                     "type": "server_vad",
-                    "threshold": 0.5,
+                    "threshold": 0.85,
                     "prefix_padding_ms": 300,
                     "silence_duration_ms": 400,
                 },
@@ -335,6 +338,14 @@ class RealtimeAudioConversationAgent:
                     vocab_words=vocab_response.vocab_words_user_asked_about,
                     user_transcripts=user_transcripts,
                     assistant_response=assistant_response,
+                )
+                print(
+                    "\033[1;32mNew vocabulary words saved: "
+                    + ", ".join(
+                        str(word)
+                        for word in vocab_response.vocab_words_user_asked_about
+                    )
+                    + "\033[0m"
                 )
 
         except Exception as e:
