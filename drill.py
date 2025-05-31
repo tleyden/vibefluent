@@ -28,7 +28,7 @@ class VocabDrillAgent:
         self.drill_conversation_history: List[str] = []  # Track drill session history
 
         drill_agent_system_prompt = self._generate_system_prompt()
-        self.drill_agent_system_prompt = drill_agent_system_prompt  # Save for logging
+        self.drill_agent_system_prompt = drill_agent_system_prompt
         self.agent = self.factory.create_agent(
             result_type=DrillResponse,
             system_prompt=drill_agent_system_prompt,
@@ -40,7 +40,7 @@ class VocabDrillAgent:
 
         # Create evaluation agent
         eval_agent_system_prompt = self._generate_evaluation_prompt()
-        self.eval_agent_system_prompt = eval_agent_system_prompt  # Save for logging
+        self.eval_agent_system_prompt = eval_agent_system_prompt
         self.evaluator = self.factory.create_agent(
             result_type=AnswerEvaluation,
             system_prompt=eval_agent_system_prompt,

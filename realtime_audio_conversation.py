@@ -28,9 +28,7 @@ class RealtimeAudioConversationAgent:
         vocab_extraction_prompt = self.prompt_manager.render_vocab_extraction_prompt(
             self.onboarding_data
         )
-        self.vocab_extraction_system_prompt = (
-            vocab_extraction_prompt  # Save for logging
-        )
+        self.vocab_extraction_system_prompt = vocab_extraction_prompt
         self.vocab_extractor = self.factory.create_agent(
             result_type=ConversationResponse,
             system_prompt=vocab_extraction_prompt,

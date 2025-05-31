@@ -21,7 +21,7 @@ class ConversationAgent:
         system_prompt = self.prompt_manager.render_conversation_system_prompt(
             self.onboarding_data, vocab_words, mode="text"
         )
-        self.conversation_system_prompt = system_prompt  # Save for logging
+        self.conversation_system_prompt = system_prompt
         self.agent = self.factory.create_agent(
             result_type=ConversationResponse,
             system_prompt=system_prompt,
@@ -37,7 +37,7 @@ class ConversationAgent:
         system_prompt = self.prompt_manager.render_initial_question_prompt(
             self.onboarding_data
         )
-        self.initial_question_system_prompt = system_prompt  # Save for logging
+        self.initial_question_system_prompt = system_prompt
         question_agent = self.factory.create_agent(
             result_type=str,
             system_prompt=system_prompt,
