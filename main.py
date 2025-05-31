@@ -117,9 +117,10 @@ def run_conversation_loop(onboarding_data):
                     onboarding_data.target_language,
                 )
 
-                print(
-                    "\nVibeFluent: Here are some vocabulary words to practice based on your message:\n"
-                    f"{', '.join(str(word) for word in response.vocab_words_user_asked_about)}\n"
+                logfire.info(
+                    f"New vocabulary words saved {', '.join(str(word) for word in response.vocab_words_user_asked_about)}",
+                    onboarding_data=onboarding_data,
+                    vocab_words=response.vocab_words_user_asked_about,
                 )
 
             print(f"\nVibeFluent: {response.assistant_message}")
