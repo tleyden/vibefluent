@@ -15,7 +15,7 @@ class VocabWord(BaseModel):
 class ConversationResponse(BaseModel):
     assistant_message: str
     follow_up_question: str
-    vocab_words_to_practice: List[VocabWord] = []
+    vocab_words_user_asked_about: List[VocabWord] = []
 
 
 class ConversationAgent:
@@ -55,9 +55,8 @@ class ConversationAgent:
         Response format:
         - assistant_message: Your main response to their message (encouraging, helpful)
         - follow_up_question: An engaging question to continue the conversation
-        - vocab_words_to_practice: Up to 3 vocabulary words or phrases to practice, 
-                                   but only words the user explicitly mentions.  Do not suggest 
-                                   related or periphery vocab words. 
+        - vocab_words_user_asked_about: Did the user explicitly ask what a word means in their current message?
+                                   If so, extract vocabulary words they might want to practice.  Otherwise, leave empty.
 
         Keep responses conversational, warm, and appropriately challenging for their level.
         """
@@ -134,10 +133,14 @@ class ConversationAgent:
         3. Helps them practice their {self.onboarding_data.target_language}
         4. Shows genuine interest in their thoughts/experiences
         5. Asks a follow-up question to continue the conversation naturally
-        6. Suggest vocabulary words only if the user explicitly asks what a 
-           word means or how to say something, or if they use the native 
-           language version of a word, which likely means they don't know the word in 
-           the target language yet.
+        
+        
+        Additional instructions:
+
+        - vocab_words_user_asked_about: Did the user explicitly ask what a word 
+                                        means in their current message |{user_message}|?
+                                        For example: "How do you say X" or "What does X mean"?  
+                                        If so, extract vocabulary words.
         
         Remember their level is {self.onboarding_data.target_language_level}, so adjust your language complexity accordingly.
         """
