@@ -12,6 +12,11 @@ class DrillResponse(BaseModel):
     expected_answer: str
 
 
+class AnswerEvaluation(BaseModel):
+    is_correct: bool
+    feedback: str
+
+
 class VocabDrillAgent:
     def __init__(self, onboarding_data: OnboardingData):
         self.onboarding_data = onboarding_data
@@ -22,6 +27,12 @@ class VocabDrillAgent:
         self.agent = self.factory.create_agent(
             result_type=DrillResponse,
             system_prompt=self._generate_system_prompt(),
+        )
+        
+        # Create evaluation agent
+        self.evaluator = self.factory.create_agent(
+            result_type=AnswerEvaluation,
+            system_prompt=self._generate_evaluation_prompt(),
         )
 
     def _generate_system_prompt(self) -> str:
@@ -40,6 +51,7 @@ class VocabDrillAgent:
         3. Adapt difficulty to their {self.onboarding_data.target_language_level} level
         4. Be encouraging and supportive
         5. Keep instructions clear and concise
+        6. Don't give away the answers directly as part of the question
         
         Drill formats to use:
         - Translation drills: "How do you say [native word] in {self.onboarding_data.target_language}?"
@@ -53,6 +65,25 @@ class VocabDrillAgent:
         
         Keep everything concise and voice-interaction friendly.
         """
+    
+    def _generate_evaluation_prompt(self) -> str:
+        return f"""
+        You are evaluating {self.onboarding_data.name}'s answers to vocabulary drills for learning {self.onboarding_data.target_language}.
+        
+        Your role:
+        1. Judge if their answer is correct or acceptable
+        2. Be lenient with minor spelling/pronunciation variations
+        3. Accept synonyms and reasonable alternative answers
+        4. For sentence creation, check if they used the word correctly in context
+        5. Provide encouraging, constructive feedback
+        6. Consider their {self.onboarding_data.target_language_level} level when evaluating
+        
+        Response format:
+        - is_correct: True if the answer is correct/acceptable, False otherwise
+        - feedback: Encouraging feedback with the correct answer if needed
+        
+        Be supportive and help them learn!
+        """
 
     def start_drill_session(self) -> str:
         """Start a new drill session with available vocabulary."""
@@ -65,7 +96,7 @@ class VocabDrillAgent:
         random.shuffle(self.current_vocab_words)
         self.current_word_index = 0
 
-        return f"Great! Let's practice your {len(self.current_vocab_words)} vocabulary words. Say 'next' for the next drill, or 'exit drill' to return to conversation mode."
+        return f"Great! Let's practice your {len(self.current_vocab_words)} vocabulary words. Say 'exit drill' to return to conversation mode."
 
     def get_next_drill(self) -> Optional[DrillResponse]:
         """Get the next vocabulary drill."""
@@ -110,19 +141,45 @@ class VocabDrillAgent:
             )
 
     def evaluate_answer(self, user_answer: str, expected: str) -> str:
-        """Evaluate user's answer and provide feedback."""
-        # Simple evaluation - in a real app you might want more sophisticated matching
-        user_clean = user_answer.strip().lower()
-        expected_clean = expected.strip().lower()
-
-        if (
-            user_clean == expected_clean
-            or user_clean in expected_clean
-            or expected_clean in user_clean
-        ):
-            return "Excellent! That's correct! 🎉"
-        else:
-            return f"Not quite. The answer was: {expected}. Let's keep practicing!"
+        """Evaluate user's answer using LLM agent for more sophisticated judgment."""
+        prompt = f"""
+        Question context: The user was asked to provide: {expected}
+        User's answer: "{user_answer}"
+        Expected answer: "{expected}"
+        
+        Please evaluate if the user's answer is correct or acceptable for a {self.onboarding_data.target_language_level} level learner.
+        Consider:
+        - Exact matches
+        - Close spelling variations
+        - Synonyms or alternative valid translations
+        - For sentence usage, whether the word is used correctly in context
+        - Minor grammatical errors that don't affect meaning
+        
+        Be encouraging and supportive in your feedback.
+        """
+        
+        try:
+            result = self.evaluator.run_sync(prompt)
+            evaluation = result.data
+            
+            if evaluation.is_correct:
+                return f"Excellent! {evaluation.feedback} 🎉"
+            else:
+                return f"{evaluation.feedback} Let's keep practicing!"
+                
+        except Exception:
+            # Fallback to simple comparison if LLM fails
+            user_clean = user_answer.strip().lower()
+            expected_clean = expected.strip().lower()
+            
+            if (
+                user_clean == expected_clean
+                or user_clean in expected_clean
+                or expected_clean in user_clean
+            ):
+                return "Excellent! That's correct! 🎉"
+            else:
+                return f"Not quite. The answer was: {expected}. Let's keep practicing!"
 
     def get_session_progress(self) -> str:
         """Get current progress in the drill session."""
