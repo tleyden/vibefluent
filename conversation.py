@@ -3,6 +3,7 @@ from llm_agent_factory import LLMAgentFactory
 from onboarding import OnboardingData
 from models import ConversationResponse
 from database import get_database
+import logfire
 
 
 class ConversationAgent:
@@ -14,9 +15,14 @@ class ConversationAgent:
         self.db = get_database()
 
         # Create the conversation agent
+        system_prompt = self._generate_system_prompt()
         self.agent = self.factory.create_agent(
             result_type=ConversationResponse,
-            system_prompt=self._generate_system_prompt(),
+            system_prompt=system_prompt,
+        )
+        logfire.info(
+            f"ConversationAgent initialized for {self.onboarding_data.name} ",
+            system_prompt=system_prompt,
         )
 
     def _generate_system_prompt(self) -> str:
@@ -86,13 +92,14 @@ class ConversationAgent:
         Make it personal and interesting based on what they've shared about their interests.
         """
 
-        try:
-            result = question_agent.run_sync(prompt)
-            generated_question = result.data.strip()
-            return f"Hello {self.onboarding_data.name}! Let's practice your {self.onboarding_data.target_language}. {generated_question}"
-        except Exception:
-            # Fallback to a generic question if LLM fails
-            return f"Hello {self.onboarding_data.name}! Let's practice your {self.onboarding_data.target_language} by talking about {self.onboarding_data.conversation_interests}. What would you like to share about this topic?"
+        logfire.info(
+            f"Generating initial question for {self.onboarding_data.name}",
+            prompt=prompt,
+            onboarding_data=self.onboarding_data,
+        )
+        result = question_agent.run_sync(prompt)
+        generated_question = result.data.strip()
+        return f"Hello {self.onboarding_data.name}! Let's practice your {self.onboarding_data.target_language}. {generated_question}"
 
     def add_to_history(self, user_message: str):
         """Add user message to conversation history, maintaining max limit."""
@@ -137,5 +144,10 @@ class ConversationAgent:
         Remember their level is {self.onboarding_data.target_language_level}, so adjust your language complexity accordingly.
         """
 
+        logfire.info(
+            f"Generating question for {self.onboarding_data.name}",
+            prompt=prompt,
+            onboarding_data=self.onboarding_data,
+        )
         result = self.agent.run_sync(prompt)
         return result.data

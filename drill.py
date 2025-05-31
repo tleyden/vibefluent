@@ -130,29 +130,14 @@ class VocabDrillAgent:
         Make sure it's suitable for voice interaction (no visual elements needed).
         """
 
-        try:
-            result = self.agent.run_sync(prompt)
-            self.current_word_index += 1
-            return result.data
-        except Exception:
-            # Fallback drill
-            drill_types = [
-                f"How do you say '{current_word.word_in_native_language}' in {self.onboarding_data.target_language}?",
-                f"What does '{current_word.word_in_target_language}' mean in {self.onboarding_data.native_language}?",
-                f"Use the word '{current_word.word_in_target_language}' in a sentence.",
-            ]
-
-            question = random.choice(drill_types)
-            expected = (
-                current_word.word_in_target_language
-                if "How do you say" in question
-                else current_word.word_in_native_language
-            )
-
-            return DrillResponse(
-                drill_question=question,
-                expected_answer=expected,
-            )
+        logfire.info(
+            f"Generating drill for {self.onboarding_data.name}",
+            prompt=prompt,
+            current_word=current_word,
+        )
+        result = self.agent.run_sync(prompt)
+        self.current_word_index += 1
+        return result.data
 
     def evaluate_answer(self, user_answer: str, expected: str) -> str:
         """Evaluate user's answer using LLM agent for more sophisticated judgment."""
@@ -172,28 +157,20 @@ class VocabDrillAgent:
         Be encouraging and supportive in your feedback.
         """
 
-        try:
-            result = self.evaluator.run_sync(prompt)
-            evaluation = result.data
+        logfire.info(
+            f"Evaluating answer for {self.onboarding_data.name}",
+            prompt=prompt,
+            user_answer=user_answer,
+            expected=expected,
+        )
+        result = self.evaluator.run_sync(prompt)
+        evaluation = result.data
 
-            if evaluation.is_correct:
-                return f"Excellent! {evaluation.feedback} 🎉"
-            else:
-                return f"{evaluation.feedback} Let's keep practicing!"
+        if evaluation.is_correct:
+            return f"Excellent! {evaluation.feedback} 🎉"
+        else:
+            return f"{evaluation.feedback} Let's keep practicing!"
 
-        except Exception:
-            # Fallback to simple comparison if LLM fails
-            user_clean = user_answer.strip().lower()
-            expected_clean = expected.strip().lower()
-
-            if (
-                user_clean == expected_clean
-                or user_clean in expected_clean
-                or expected_clean in user_clean
-            ):
-                return "Excellent! That's correct! 🎉"
-            else:
-                return f"Not quite. The answer was: {expected}. Let's keep practicing!"
 
     def get_session_progress(self) -> str:
         """Get current progress in the drill session."""
