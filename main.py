@@ -136,7 +136,7 @@ def run_conversation_loop(onboarding_data):
 
 def main():
     load_dotenv()
-    
+
     # Initialize logfire
     LOGFIRE_API_KEY = os.environ.get("LOGFIRE_API_KEY", "")
     if LOGFIRE_API_KEY:
@@ -146,7 +146,7 @@ def main():
             environment="development",
         )
         logfire.info("VibeFluent application started successfully")
-    
+
     # Check if user has completed onboarding
     onboarding_data = load_onboarding_data()
 
