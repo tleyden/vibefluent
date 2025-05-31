@@ -5,7 +5,7 @@ from models import VocabWord
 from database import get_database
 import random
 from pydantic import BaseModel
-
+import logfire
 
 class DrillResponse(BaseModel):
     drill_question: str
@@ -24,15 +24,26 @@ class VocabDrillAgent:
         self.db = get_database()
         self.current_vocab_words: List[VocabWord] = []
         self.current_word_index = 0
+
+        drill_agent_system_prompt = self._generate_system_prompt()
         self.agent = self.factory.create_agent(
             result_type=DrillResponse,
-            system_prompt=self._generate_system_prompt(),
+            system_prompt=drill_agent_system_prompt,
+        )
+        logfire.info(
+            f"VocabDrillAgent initialized for {self.onboarding_data.name} ",
+            system_prompt=drill_agent_system_prompt,
         )
 
         # Create evaluation agent
+        eval_agent_system_prompt = self._generate_evaluation_prompt()
         self.evaluator = self.factory.create_agent(
             result_type=AnswerEvaluation,
-            system_prompt=self._generate_evaluation_prompt(),
+            system_prompt=eval_agent_system_prompt,
+        )
+        logfire.info(
+            f"VocabDrillAgent Evaluator initialized for {self.onboarding_data.name} ",
+            system_prompt=eval_agent_system_prompt,
         )
 
     def _generate_system_prompt(self) -> str:

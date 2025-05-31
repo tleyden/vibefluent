@@ -81,7 +81,10 @@ colorama==0.4.6 \
 deprecated==1.2.18 \
     --hash=sha256:422b6f6d859da6f2ef57857761bfb392480502a64c3028ca9bbe86085d72115d \
     --hash=sha256:bd5011788200372a32418f888e326a09ff80d0214bd961147cfed01b5c018eec
-    # via opentelemetry-api
+    # via
+    #   opentelemetry-api
+    #   opentelemetry-exporter-otlp-proto-http
+    #   opentelemetry-semantic-conventions
 distro==1.9.0 \
     --hash=sha256:2fa77c6fd8940f116ee1d6b94a2f90b13b5ea8d019b98bc8bafdcabcdd9bdbed \
     --hash=sha256:7bffd925d65168f85027d8da9af6bddab658135b840670a223589bc0c8ef02b2
@@ -95,6 +98,10 @@ eval-type-backport==0.2.2 \
     # via
     #   mistralai
     #   pydantic-ai-slim
+executing==2.2.0 \
+    --hash=sha256:11387150cad388d62750327a53d3339fad4888b39a6fe233c3afbb54ecffd3aa \
+    --hash=sha256:5d108c028108fe2551d1a7b2e8b713341e2cb4fc0aa7dcf966fa4327a5226755
+    # via logfire
 fasta2a==0.2.12 \
     --hash=sha256:abf1a9bb191f101faa8aceb84ae2ead4f20abe16aebc23a60a878f6f23f9e15e \
     --hash=sha256:e68739c7ce8cb501fc2d003bd0b239f53f7ed55533d612019117fa312cfe9f2b
@@ -131,6 +138,10 @@ google-genai==1.17.0 \
     --hash=sha256:0a5ba765cc9900a5fa7e71ed4520a1560a857754e72db32765009e2e9fe75333 \
     --hash=sha256:2cf0ff1218290efe6fad80d586cc4aed5a1ca6d38407d1ae221cf10e308c299b
     # via pydantic-ai-slim
+googleapis-common-protos==1.70.0 \
+    --hash=sha256:0e1b44e0ea153e6594f9f394fef15193a68aaaea2d843f83e2742717ca753257 \
+    --hash=sha256:b8bfcca8c25a2bb253e0e0b0adaf8c00773e5e6af6fd92397576680b807e0fd8
+    # via opentelemetry-exporter-otlp-proto-http
 greenlet==3.2.2 ; (python_full_version < '3.14' and platform_machine == 'AMD64') or (python_full_version < '3.14' and platform_machine == 'WIN32') or (python_full_version < '3.14' and platform_machine == 'aarch64') or (python_full_version < '3.14' and platform_machine == 'amd64') or (python_full_version < '3.14' and platform_machine == 'ppc64le') or (python_full_version < '3.14' and platform_machine == 'win32') or (python_full_version < '3.14' and platform_machine == 'x86_64') \
     --hash=sha256:02a98600899ca1ca5d3a2590974c9e3ec259503b2d6ba6527605fcd74e08e207 \
     --hash=sha256:055916fafad3e3388d27dd68517478933a97edc2fc54ae79d3bec827de2c64c4 \
@@ -252,6 +263,10 @@ jmespath==1.0.1 \
     # via
     #   boto3
     #   botocore
+logfire==3.16.1 \
+    --hash=sha256:0622089e776294f54de31ede0c6cb23d4891f8f7e4bd4dbd89ee5fed8eb8c27f \
+    --hash=sha256:de91504243737cf161d4704a9980fbe3640f1e20c6df5f1948cb1cc559356a28
+    # via vibefluent
 logfire-api==3.16.1 \
     --hash=sha256:b624927dd2da1f3ce7031434a3db61ecbbfecb94d1e2636b9eb616adde0dfeee \
     --hash=sha256:da0d232fffadded58339b91a5a1b5f45c4bd05a62e9241c973de9c5bebe34521
@@ -283,15 +298,63 @@ opentelemetry-api==1.33.1 \
     --hash=sha256:4db83ebcf7ea93e64637ec6ee6fabee45c5cbe4abd9cf3da95c43828ddb50b83
     # via
     #   fasta2a
+    #   opentelemetry-exporter-otlp-proto-http
+    #   opentelemetry-instrumentation
+    #   opentelemetry-sdk
+    #   opentelemetry-semantic-conventions
     #   pydantic-ai-slim
-packaging==25.0 ; sys_platform != 'emscripten' \
+opentelemetry-exporter-otlp-proto-common==1.33.1 \
+    --hash=sha256:b81c1de1ad349785e601d02715b2d29d6818aed2c809c20219f3d1f20b038c36 \
+    --hash=sha256:c57b3fa2d0595a21c4ed586f74f948d259d9949b58258f11edb398f246bec131
+    # via opentelemetry-exporter-otlp-proto-http
+opentelemetry-exporter-otlp-proto-http==1.33.1 \
+    --hash=sha256:46622d964a441acb46f463ebdc26929d9dec9efb2e54ef06acdc7305e8593c38 \
+    --hash=sha256:ebd6c523b89a2ecba0549adb92537cc2bf647b4ee61afbbd5a4c6535aa3da7cf
+    # via logfire
+opentelemetry-instrumentation==0.54b1 \
+    --hash=sha256:7658bf2ff914b02f246ec14779b66671508125c0e4227361e56b5ebf6cef0aec \
+    --hash=sha256:a4ae45f4a90c78d7006c51524f57cd5aa1231aef031eae905ee34d5423f5b198
+    # via logfire
+opentelemetry-proto==1.33.1 \
+    --hash=sha256:243d285d9f29663fc7ea91a7171fcc1ccbbfff43b48df0774fd64a37d98eda70 \
+    --hash=sha256:9627b0a5c90753bf3920c398908307063e4458b287bb890e5c1d6fa11ad50b68
+    # via
+    #   opentelemetry-exporter-otlp-proto-common
+    #   opentelemetry-exporter-otlp-proto-http
+opentelemetry-sdk==1.33.1 \
+    --hash=sha256:19ea73d9a01be29cacaa5d6c8ce0adc0b7f7b4d58cc52f923e4413609f670112 \
+    --hash=sha256:85b9fcf7c3d23506fbc9692fd210b8b025a1920535feec50bd54ce203d57a531
+    # via
+    #   logfire
+    #   opentelemetry-exporter-otlp-proto-http
+opentelemetry-semantic-conventions==0.54b1 \
+    --hash=sha256:29dab644a7e435b58d3a3918b58c333c92686236b30f7891d5e51f02933ca60d \
+    --hash=sha256:d1cecedae15d19bdaafca1e56b29a66aa286f50b5d08f036a145c7f3e9ef9cee
+    # via
+    #   opentelemetry-instrumentation
+    #   opentelemetry-sdk
+packaging==25.0 \
     --hash=sha256:29572ef2b1f17581046b3a2227d5c611fb25ec70ca1ba8554b24b0e69331a484 \
     --hash=sha256:d443872c98d677bf60f6a1f2f8c1cb748e8fe762d2bf9d3148b5599295b0fc4f
-    # via huggingface-hub
+    # via
+    #   huggingface-hub
+    #   opentelemetry-instrumentation
 prompt-toolkit==3.0.51 \
     --hash=sha256:52742911fde84e2d423e2f9a4cf1de7d7ac4e51958f648d9540e0fb8db077b07 \
     --hash=sha256:931a162e3b27fc90c86f1b48bb1fb2c528c2761475e57c9c06de13311c7b54ed
     # via pydantic-ai-slim
+protobuf==5.29.5 \
+    --hash=sha256:3f1c6468a2cfd102ff4703976138844f78ebd1fb45f49011afc5139e9e283079 \
+    --hash=sha256:3f76e3a3675b4a4d867b52e4a5f5b78a2ef9565549d4037e06cf7b0942b1d3fc \
+    --hash=sha256:63848923da3325e1bf7e9003d680ce6e14b07e55d0473253a690c3a8b8fd6e61 \
+    --hash=sha256:6cf42630262c59b2d8de33954443d94b746c952b01434fc58a417fdbd2e84bd5 \
+    --hash=sha256:bc1463bafd4b0929216c35f437a8e28731a2b7fe3d98bb77a600efced5a15c84 \
+    --hash=sha256:e38c5add5a311f2a6eb0340716ef9b039c1dfa428b28f25a7838ac329204a671 \
+    --hash=sha256:fa18533a299d7ab6c55a238bf8629311439995f2e7eca5caaff08663606e9015
+    # via
+    #   googleapis-common-protos
+    #   logfire
+    #   opentelemetry-proto
 pyasn1==0.6.1 \
     --hash=sha256:0d632f46f2ba09143da3a8afe9e33fb6f92fa2320ab7e886e2d0f7672af84629 \
     --hash=sha256:6f580d2bdd84365380830acf45550f2511469f673cb4a5ae3857a3170128b034
@@ -401,11 +464,13 @@ requests==2.32.3 \
     #   cohere
     #   google-genai
     #   huggingface-hub
+    #   opentelemetry-exporter-otlp-proto-http
     #   pydantic-ai-slim
 rich==14.0.0 \
     --hash=sha256:1c9491e1951aac09caffd42f448ee3d04e58923ffe14993f6e83068dc395d7e0 \
     --hash=sha256:82f1bc23a6a21ebca4ae0c45af9bdbc492ed20231dcb63f297d6d1021a9d5725
     # via
+    #   logfire
     #   pydantic-ai-slim
     #   pydantic-evals
 rsa==4.9.1 \
@@ -486,7 +551,9 @@ typing-extensions==4.13.2 \
     #   google-genai
     #   groq
     #   huggingface-hub
+    #   logfire
     #   openai
+    #   opentelemetry-sdk
     #   pydantic
     #   pydantic-core
     #   sqlalchemy
@@ -555,7 +622,9 @@ wrapt==1.17.2 \
     --hash=sha256:e3890b508a23299083e065f435a492b5435eba6e304a7114d2f919d400888cc6 \
     --hash=sha256:e496a8ce2c256da1eb98bd15803a79bee00fc351f5dfb9ea82594a3f058309e0 \
     --hash=sha256:eaf675418ed6b3b31c7a989fd007fa7c3be66ce14e5c3b27336383604c9da85c
-    # via deprecated
+    # via
+    #   deprecated
+    #   opentelemetry-instrumentation
 zipp==3.22.0 \
     --hash=sha256:dd2f28c3ce4bc67507bfd3781d21b7bb2be31103b51a4553ad7d90b84e57ace5 \
     --hash=sha256:fe208f65f2aca48b81f9e6fd8cf7b8b32c26375266b009b413d45306b6148343
