@@ -1,5 +1,6 @@
 from onboarding import load_onboarding_data, run_onboarding
 from conversation import ConversationAgent
+from database import get_database
 from dotenv import load_dotenv
 
 
@@ -10,8 +11,9 @@ def run_conversation_loop(onboarding_data):
     print("Type 'quit' or 'exit' to end the conversation")
     print("=" * 60 + "\n")
 
-    # Initialize conversation agent
+    # Initialize conversation agent and database
     conversation_agent = ConversationAgent(onboarding_data)
+    db = get_database()
 
     # Start with initial question
     initial_question = conversation_agent.generate_initial_question()
@@ -38,7 +40,14 @@ def run_conversation_loop(onboarding_data):
             print("\nThinking... 🤔")
             response = conversation_agent.get_response(user_input)
 
+            # Save vocab words to database if any were returned
             if response.vocab_words_user_asked_about:
+                db.save_vocab_words(
+                    response.vocab_words_user_asked_about,
+                    onboarding_data.native_language,
+                    onboarding_data.target_language,
+                )
+
                 print(
                     "\nVibeFluent: Here are some vocabulary words to practice based on your message:\n"
                     f"{', '.join(str(word) for word in response.vocab_words_user_asked_about)}\n"

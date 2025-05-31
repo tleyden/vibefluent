@@ -1,6 +1,9 @@
-from sqlalchemy import create_engine, Column, String, Integer
+from sqlalchemy import create_engine, Column, String, Integer, DateTime
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
+from typing import List
+from datetime import datetime
+from models import VocabWord
 
 Base = declarative_base()
 
@@ -15,6 +18,17 @@ class OnboardingRecord(Base):
     conversation_interests = Column(String, nullable=False)
     target_language_level = Column(String, nullable=False)
     reason_for_learning = Column(String, nullable=False)
+
+
+class VocabRecord(Base):
+    __tablename__ = "vocab"
+
+    id = Column(Integer, primary_key=True)
+    native_language = Column(String, nullable=False)
+    target_language = Column(String, nullable=False)
+    vocab_word_native = Column(String, nullable=False)
+    vocab_word_target = Column(String, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 
 class Database:
@@ -58,6 +72,49 @@ class Database:
                 reason_for_learning=record.reason_for_learning,
             )
         return None
+
+    def save_vocab_words(
+        self, vocab_words: List[VocabWord], native_language: str, target_language: str
+    ) -> None:
+        """Save vocabulary words to the vocab table."""
+        for vocab_word in vocab_words:
+            # Check if this vocab pair already exists
+            existing = (
+                self.session.query(VocabRecord)
+                .filter_by(
+                    native_language=native_language,
+                    target_language=target_language,
+                    vocab_word_native=vocab_word.word_in_native_language,
+                    vocab_word_target=vocab_word.word_in_target_language,
+                )
+                .first()
+            )
+
+            # Only add if it doesn't already exist
+            if not existing:
+                vocab_record = VocabRecord(
+                    native_language=native_language,
+                    target_language=target_language,
+                    vocab_word_native=vocab_word.word_in_native_language,
+                    vocab_word_target=vocab_word.word_in_target_language,
+                )
+                self.session.add(vocab_record)
+
+        self.session.commit()
+
+    def get_vocab_words(
+        self, native_language: str, target_language: str
+    ) -> List[VocabRecord]:
+        """Get all vocabulary words for a language pair."""
+        return (
+            self.session.query(VocabRecord)
+            .filter_by(
+                native_language=native_language,
+                target_language=target_language,
+            )
+            .order_by(VocabRecord.created_at.desc())
+            .all()
+        )
 
     def close(self):
         """Close database session."""
