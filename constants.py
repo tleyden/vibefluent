@@ -4,4 +4,7 @@ DEFAULT_REASONING_MODEL = "o1"
 DUMP_RAW_LLM_OUTPUT = False
 
 # Mode constants
-MODE = "TEXT"  # Options: "TEXT" or "REALTIME_AUDIO"
+# MODE = "TEXT"  # Options: "TEXT" or "REALTIME_AUDIO"
+
+# To enable realtime audio mode, change MODE to:
+MODE = "REALTIME_AUDIO"

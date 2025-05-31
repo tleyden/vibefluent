@@ -10,6 +10,7 @@ import os
 import readline
 import signal
 import sys
+import asyncio
 
 
 def signal_handler(sig, frame):
@@ -38,7 +39,8 @@ def run_conversation_loop(onboarding_data):
     print("🌍 Welcome to your conversation practice! 🌍")
     print(f"Mode: {MODE}")
     print("Type 'quit' or 'exit' to end the conversation")
-    print("Type 'drill mode' to enter vocabulary drill mode")
+    if MODE != "REALTIME_AUDIO":
+        print("Type 'drill mode' to enter vocabulary drill mode")
     print("Type 're-onboard' to update your profile settings")
     print("Press Ctrl+C to exit anytime")
     print("=" * 60 + "\n")
@@ -46,9 +48,10 @@ def run_conversation_loop(onboarding_data):
     # Initialize agents and database based on mode
     if MODE == "REALTIME_AUDIO":
         conversation_agent = RealtimeAudioConversationAgent(onboarding_data)
+        return run_realtime_audio_loop(conversation_agent, onboarding_data)
     else:  # Default to TEXT mode
         conversation_agent = ConversationAgent(onboarding_data)
-
+    
     drill_agent = VocabDrillAgent(onboarding_data)
     db = get_database()
 
@@ -92,7 +95,9 @@ def run_conversation_loop(onboarding_data):
 
                 # Reinitialize agents with new data
                 if MODE == "REALTIME_AUDIO":
-                    conversation_agent = RealtimeAudioConversationAgent(new_onboarding_data)
+                    conversation_agent = RealtimeAudioConversationAgent(
+                        new_onboarding_data
+                    )
                 else:  # Default to TEXT mode
                     conversation_agent = ConversationAgent(new_onboarding_data)
                 drill_agent = VocabDrillAgent(new_onboarding_data)
@@ -202,6 +207,103 @@ def run_conversation_loop(onboarding_data):
             print(f"\nSorry, I encountered an error: {e}")
             mode_text = "drill" if is_drill_mode else "conversation"
             print(f"Let's keep going! (Currently in {mode_text} mode)\n")
+
+
+def run_realtime_audio_loop(conversation_agent, onboarding_data):
+    """Run the realtime audio conversation loop."""
+    async def audio_loop():
+        print(f"VibeFluent: {conversation_agent.generate_initial_question()}\n")
+        
+        # Start the realtime conversation
+        success = await conversation_agent.start_conversation()
+        if not success:
+            print("Failed to start realtime audio mode. Please check your internet connection and API key.")
+            return
+        
+        print("🎤 Realtime audio mode active! Speak naturally - I'll respond with voice.")
+        print("Commands you can type:")
+        print("- 'quit' or 'exit': End the session")
+        print("- 're-onboard': Update your profile")
+        print("- Press Enter: Start/stop recording")
+        print("=" * 60 + "\n")
+        
+        # Create tasks for handling WebSocket and user input
+        input_task = asyncio.create_task(handle_realtime_input(conversation_agent, onboarding_data))
+        
+        try:
+            await input_task
+        except KeyboardInterrupt:
+            print(f"\n\nGoodbye, {onboarding_data.name}! Thanks for practicing! 👋")
+        finally:
+            await conversation_agent.stop_conversation()
+    
+    # Run the async audio loop
+    try:
+        asyncio.run(audio_loop())
+    except Exception as e:
+        print(f"Error in realtime audio mode: {e}")
+        print("Falling back to text mode...")
+
+async def handle_realtime_input(conversation_agent, onboarding_data):
+    """Handle user input during realtime audio mode."""
+    loop = asyncio.get_event_loop()
+    
+    while True:
+        try:
+            # Get user input in a non-blocking way
+            user_input = await loop.run_in_executor(None, get_user_input, "Command (or Enter to toggle recording): ")
+            
+            # Check for exit commands
+            if user_input.lower() in ["quit", "exit", "q"]:
+                print(f"\nGoodbye, {onboarding_data.name}! Keep practicing your {onboarding_data.target_language}! 🎉")
+                break
+            
+            # Check for re-onboard command
+            if user_input == "re-onboard":
+                print("\n🔄 Re-onboarding Mode! 🔄")
+                print("Let's update your profile settings...")
+                
+                # Stop current conversation
+                await conversation_agent.stop_conversation()
+                
+                # Delete existing onboarding data
+                from database import get_database
+                db = get_database()
+                db.delete_onboarding_data()
+                
+                # Run onboarding again
+                from onboarding import run_onboarding
+                new_onboarding_data = run_onboarding()
+                
+                print(f"\nProfile updated successfully, {new_onboarding_data.name}!")
+                print(f"Now ready to help you learn {new_onboarding_data.target_language}!")
+                
+                # Create new conversation agent
+                conversation_agent = RealtimeAudioConversationAgent(new_onboarding_data)
+                
+                # Restart conversation
+                success = await conversation_agent.start_conversation()
+                if not success:
+                    print("Failed to restart realtime audio mode.")
+                    break
+                
+                continue
+            
+            # Toggle recording on Enter (empty input)
+            if not user_input:
+                if conversation_agent.is_recording:
+                    print("🔴 Recording paused - press Enter to resume")
+                    conversation_agent.is_recording = False
+                else:
+                    print("🎤 Recording resumed - speak naturally!")
+                    conversation_agent.is_recording = True
+                continue
+            
+            # Send text commands to the conversation
+            await conversation_agent.send_text_message(user_input)
+            
+        except (EOFError, KeyboardInterrupt):
+            break
 
 
 def main():
