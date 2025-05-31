@@ -26,8 +26,10 @@ class RealtimeAudioConversationAgent:
         self.factory = LLMAgentFactory()
 
         # Create vocabulary extraction agent
-        vocab_extraction_prompt = self.prompt_manager.render_vocab_extraction_prompt(
-            self.onboarding_data
+        vocab_extraction_prompt = (
+            self.prompt_manager.render_realtime_vocab_extraction_prompt(
+                self.onboarding_data
+            )
         )
         self.vocab_extractor = self.factory.create_agent(
             result_type=ConversationResponse,
@@ -66,6 +68,9 @@ class RealtimeAudioConversationAgent:
             f"RealtimeAudioConversationAgent initialized for {self.onboarding_data.name}",
             onboarding_data=onboarding_data,
         )
+
+        # Store pending user input for vocabulary extraction
+        self.pending_user_input: Optional[str] = None
 
     def generate_initial_question(self) -> str:
         """Generate a personalized question for realtime audio mode."""
@@ -366,6 +371,102 @@ class RealtimeAudioConversationAgent:
                 logfire.trace(f"Cancellation attempt failed (expected): {error_msg}")
             else:
                 logfire.error(f"API error: {error_msg}")
+
+    def handle_conversation_item_created(self, event):
+        """Handle when a conversation item is created."""
+        item = event.get("item", {})
+        item_type = item.get("type")
+
+        if item_type == "message":
+            role = item.get("role")
+            content = item.get("content", [])
+
+            if role == "user" and content:
+                # Store user input for later vocabulary extraction
+                for content_part in content:
+                    if content_part.get("type") == "input_text":
+                        transcript = content_part.get("text", "")
+                        if transcript.strip():
+                            self.pending_user_input = transcript.strip()
+                            logfire.info(
+                                f"Stored user input for vocab extraction: {transcript}",
+                                user_input=transcript,
+                                onboarding_data=self.onboarding_data,
+                            )
+
+    def handle_response_audio_delta(self, event):
+        """Handle audio response chunks."""
+        # ...existing code...
+
+    def handle_response_done(self, event):
+        """Handle when assistant response is complete."""
+        response = event.get("response", {})
+        output = response.get("output", [])
+
+        # Extract assistant response text
+        assistant_response = ""
+        for output_item in output:
+            if output_item.get("type") == "message":
+                content = output_item.get("content", [])
+                for content_part in content:
+                    if content_part.get("type") == "text":
+                        assistant_response += content_part.get("text", "")
+
+        # Now extract vocabulary using both user input and assistant response
+        if self.pending_user_input and assistant_response:
+            self.extract_vocabulary_from_exchange(
+                self.pending_user_input, assistant_response
+            )
+            # Clear pending input after processing
+            self.pending_user_input = None
+
+    def extract_vocabulary_from_exchange(
+        self, user_input: str, assistant_response: str
+    ):
+        """Extract vocabulary words from the complete user-assistant exchange."""
+        prompt = f"""
+        Analyze this conversation exchange for vocabulary learning:
+        
+        User said: "{user_input}"
+        Assistant responded: "{assistant_response}"
+        
+        Extract any vocabulary words that the user explicitly asked about or that the assistant explained/translated.
+        Consider both what the user requested and what the assistant provided in response.
+        
+        Look for patterns like:
+        - User asking "How do you say X?" and assistant providing translation
+        - User asking "What does X mean?" and assistant explaining
+        - Assistant providing translations or explanations of specific words
+        
+        Focus on meaningful vocabulary learning moments, not casual conversation words.
+        """
+
+        try:
+            result = self.vocab_extractor.run_sync(prompt)
+            vocab_response = result.data
+
+            if vocab_response.vocab_words_user_asked_about:
+                # Save vocabulary words to database
+                self.db.save_vocab_words(
+                    vocab_response.vocab_words_user_asked_about,
+                    self.onboarding_data.native_language,
+                    self.onboarding_data.target_language,
+                )
+
+                logfire.info(
+                    f"Extracted vocabulary from exchange: {', '.join(str(word) for word in vocab_response.vocab_words_user_asked_about)}",
+                    user_input=user_input,
+                    assistant_response=assistant_response,
+                    vocab_words=vocab_response.vocab_words_user_asked_about,
+                    onboarding_data=self.onboarding_data,
+                )
+        except Exception as e:
+            logfire.error(
+                f"Error extracting vocabulary: {e}",
+                user_input=user_input,
+                assistant_response=assistant_response,
+                onboarding_data=self.onboarding_data,
+            )
 
     async def start_conversation(self):
         """Start the realtime audio conversation."""
