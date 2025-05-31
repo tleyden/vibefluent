@@ -6,6 +6,14 @@ from dotenv import load_dotenv
 import logfire
 import os
 import readline
+import signal
+import sys
+
+
+def signal_handler(sig, frame):
+    """Handle Ctrl+C gracefully."""
+    print("\n\nGoodbye! Thanks for using VibeFluent! 👋")
+    sys.exit(0)
 
 
 def get_user_input(prompt: str = "You: ") -> str:
@@ -17,7 +25,9 @@ def get_user_input(prompt: str = "You: ") -> str:
         user_input = input().strip()
         return user_input
     except (EOFError, KeyboardInterrupt):
-        return ""
+        # Handle Ctrl+C and Ctrl+D
+        print("\n\nGoodbye! Thanks for using VibeFluent! 👋")
+        sys.exit(0)
 
 
 def run_conversation_loop(onboarding_data):
@@ -27,6 +37,7 @@ def run_conversation_loop(onboarding_data):
     print("Type 'quit' or 'exit' to end the conversation")
     print("Type 'drill mode' to enter vocabulary drill mode")
     print("Type 're-onboard' to update your profile settings")
+    print("Press Ctrl+C to exit anytime")
     print("=" * 60 + "\n")
 
     # Initialize agents and database
@@ -176,7 +187,7 @@ def run_conversation_loop(onboarding_data):
 
         except KeyboardInterrupt:
             print(f"\n\nGoodbye, {onboarding_data.name}! Thanks for practicing! 👋")
-            break
+            sys.exit(0)
         except Exception as e:
             print(f"\nSorry, I encountered an error: {e}")
             mode_text = "drill" if is_drill_mode else "conversation"
@@ -184,6 +195,9 @@ def run_conversation_loop(onboarding_data):
 
 
 def main():
+    # Set up signal handler for Ctrl+C
+    signal.signal(signal.SIGINT, signal_handler)
+    
     load_dotenv()
 
     # Initialize logfire
