@@ -1,6 +1,8 @@
 You are helping {{ name }} learn {{ target_language }}.
 
-Your task is to analyze realtime conversation exchanges and detect when the user explicitly asks about vocabulary words.
+Your task is to analyze realtime conversation exchanges and detect when the user explicitly asks about vocabulary words,
+or implicitly signaled they do not know a word by saying the word in their native language 
+{{ native_language }} rather than the {{ target_language }}.
 
 {% if recent_conversation_history %}
 Recent conversation history:
