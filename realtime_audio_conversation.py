@@ -6,13 +6,14 @@ import pyaudio
 import threading
 import queue
 import os
-from typing import List
+from typing import List, Optional
 from onboarding import OnboardingData
 from models import ConversationResponse
 from database import get_database
 from prompt_manager import get_prompt_manager
 import logfire
-from typing import Optional
+from llm_agent_factory import LLMAgentFactory
+
 
 class RealtimeAudioConversationAgent:
     def __init__(self, onboarding_data: OnboardingData):
@@ -21,6 +22,17 @@ class RealtimeAudioConversationAgent:
         self.max_history = 100
         self.db = get_database()
         self.prompt_manager = get_prompt_manager()
+        self.factory = LLMAgentFactory()
+
+        # Create vocabulary extraction agent
+        vocab_extraction_prompt = self.prompt_manager.render_vocab_extraction_prompt(
+            self.onboarding_data
+        )
+        self.vocab_extraction_system_prompt = vocab_extraction_prompt
+        self.vocab_extractor = self.factory.create_agent(
+            result_type=ConversationResponse,
+            system_prompt=vocab_extraction_prompt,
+        )
 
         # Audio settings
         self.sample_rate = 24000
@@ -50,6 +62,9 @@ class RealtimeAudioConversationAgent:
                 "OPENAI_API_KEY environment variable is required for realtime audio mode"
             )
 
+        # Track pending user transcripts for vocabulary processing
+        self.pending_user_transcripts: List[str] = []
+
         logfire.info(
             f"RealtimeAudioConversationAgent initialized for {self.onboarding_data.name}",
             onboarding_data=onboarding_data,
@@ -57,7 +72,7 @@ class RealtimeAudioConversationAgent:
 
     def generate_initial_question(self) -> str:
         """Generate a personalized question for realtime audio mode."""
-        return f"Hello {self.onboarding_data.name}! Welcome to realtime audio mode. I'll speak with you to help practice your {self.onboarding_data.target_language}. Press Enter to start recording, and I'll respond with audio. Say 'exit realtime' to return to text mode."
+        return f"Hello {self.onboarding_data.name}! Welcome to realtime audio mode. I'll speak with you to help practice your {self.onboarding_data.target_language}. Start speaking, and I'll respond with audio."
 
     def _create_system_message(self) -> str:
         """Create the system message for the OpenAI Realtime API using template."""
@@ -99,6 +114,31 @@ class RealtimeAudioConversationAgent:
 
     async def _configure_session(self):
         """Configure the OpenAI Realtime session."""
+        # Map common language names to ISO codes for Whisper
+        language_mapping = {
+            "Spanish": "es",
+            "French": "fr",
+            "German": "de",
+            "Italian": "it",
+            "Portuguese": "pt",
+            "Russian": "ru",
+            "Japanese": "ja",
+            "Korean": "ko",
+            "Chinese": "zh",
+            "Mandarin": "zh",
+            "Dutch": "nl",
+            "Polish": "pl",
+            "Turkish": "tr",
+            "Arabic": "ar",
+            "Hindi": "hi",
+            "English": "en",
+        }
+
+        # Get the ISO language code for the target language
+        target_lang_code = language_mapping.get(
+            self.onboarding_data.target_language, "en"
+        )
+
         config = {
             "type": "session.update",
             "session": {
@@ -107,12 +147,15 @@ class RealtimeAudioConversationAgent:
                 "voice": "alloy",
                 "input_audio_format": "pcm16",
                 "output_audio_format": "pcm16",
-                "input_audio_transcription": {"model": "whisper-1"},
+                "input_audio_transcription": {
+                    "model": "whisper-1",
+                    "language": target_lang_code,
+                },
                 "turn_detection": {
                     "type": "server_vad",
                     "threshold": 0.5,
                     "prefix_padding_ms": 300,
-                    "silence_duration_ms": 200,
+                    "silence_duration_ms": 400,
                 },
                 "tools": [],
                 "tool_choice": "auto",
@@ -127,7 +170,9 @@ class RealtimeAudioConversationAgent:
             )
 
         await self.websocket.send(json.dumps(config))
-        logfire.info("Session configured for realtime audio")
+        logfire.info(
+            f"Session configured for realtime audio with {self.onboarding_data.target_language} transcription"
+        )
 
     def _start_audio_input_stream(self):
         """Start recording audio from microphone."""
@@ -234,6 +279,67 @@ class RealtimeAudioConversationAgent:
             except Exception as e:
                 logfire.error(f"WebSocket message handling error: {e}")
 
+    async def _process_user_transcript(
+        self,
+        user_transcripts: List[str],
+        assistant_response: str,
+        conversation_history: List[str],
+    ):
+        """Process user transcripts with assistant response context to detect and save vocabulary words."""
+        if not user_transcripts or not any(t.strip() for t in user_transcripts):
+            return
+
+        try:
+            # Get last 5 messages from conversation history for context
+            recent_history = (
+                conversation_history[-5:]
+                if len(conversation_history) > 5
+                else conversation_history
+            )
+
+            # Combine user transcripts into a single context
+            user_input = " ".join(user_transcripts)
+
+            # Use prompt manager to render the realtime vocab extraction prompt
+            prompt = self.prompt_manager.render_realtime_vocab_extraction_prompt(
+                user_transcripts=user_input,
+                assistant_response=assistant_response,
+                recent_conversation_history=recent_history,
+                onboarding_data=self.onboarding_data,
+            )
+
+            # Use async version instead of sync
+            result = await self.vocab_extractor.run(prompt)
+
+            logfire.info(
+                f"Vocab extractor agent result for {self.onboarding_data.name}",
+                result=result.data,
+                prompt=prompt,
+                system_prompt=self.vocab_extraction_system_prompt,
+                onboarding_data=self.onboarding_data,
+            )
+
+            vocab_response = result.data
+
+            # Save any vocabulary words that were detected
+            if vocab_response.vocab_words_user_asked_about:
+                self.db.save_vocab_words(
+                    vocab_response.vocab_words_user_asked_about,
+                    self.onboarding_data.native_language,
+                    self.onboarding_data.target_language,
+                )
+
+                logfire.info(
+                    f"New vocabulary words saved from audio conversation: {', '.join(str(word) for word in vocab_response.vocab_words_user_asked_about)}",
+                    onboarding_data=self.onboarding_data,
+                    vocab_words=vocab_response.vocab_words_user_asked_about,
+                    user_transcripts=user_transcripts,
+                    assistant_response=assistant_response,
+                )
+
+        except Exception as e:
+            logfire.error(f"Error processing user transcript for vocab: {e}")
+
     async def _process_websocket_message(self, data):
         """Process different types of messages from the API."""
         message_type = data.get("type")
@@ -254,11 +360,21 @@ class RealtimeAudioConversationAgent:
                 pass
 
         elif message_type == "response.audio_transcript.done":
-            # Complete transcript received
+            # Complete assistant transcript received
             transcript = data.get("transcript", "")
             if transcript:
                 self.conversation_history.append(f"Assistant: {transcript}")
                 logfire.info(f"Assistant transcript: {transcript}")
+
+                # Process vocabulary if we have pending user transcripts
+                if self.pending_user_transcripts:
+                    await self._process_user_transcript(
+                        self.pending_user_transcripts,
+                        transcript,
+                        self.conversation_history,
+                    )
+                    # Reset the pending transcripts after processing
+                    self.pending_user_transcripts = []
 
         elif message_type == "response.created":
             # Response generation started
@@ -296,6 +412,9 @@ class RealtimeAudioConversationAgent:
                 self.conversation_history.append(f"User: {transcript}")
                 logfire.info(f"User transcript: {transcript}")
 
+                # Add transcript to pending list for processing after assistant responds
+                self.pending_user_transcripts.append(transcript)
+
         elif message_type == "response.cancelled":
             # Assistant response was cancelled (due to interruption)
             logfire.info("Assistant response was cancelled")
@@ -304,6 +423,8 @@ class RealtimeAudioConversationAgent:
             self.is_assistant_speaking = False
             # Clear any remaining audio in the queue to stop playback immediately
             self._clear_audio_queue()
+            # Clear pending transcripts since response was cancelled
+            self.pending_user_transcripts = []
 
         elif message_type == "error":
             error_msg = data.get("error", {}).get("message", "Unknown error")

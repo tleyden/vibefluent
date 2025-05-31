@@ -43,6 +43,12 @@ class PromptManager:
         context = self._get_base_context(onboarding_data)
         return template.render(**context)
 
+    def render_vocab_extraction_prompt(self, onboarding_data: OnboardingData) -> str:
+        """Render the vocabulary extraction prompt template."""
+        template = self.env.get_template("vocab_extraction_prompt.j2")
+        context = self._get_base_context(onboarding_data)
+        return template.render(**context)
+
     def render_realtime_session_config(
         self, onboarding_data: OnboardingData, vocab_context: str = ""
     ) -> str:
@@ -50,6 +56,25 @@ class PromptManager:
         template = self.env.get_template("realtime_session_config.j2")
         context = self._get_base_context(onboarding_data)
         context.update({"vocab_context": vocab_context})
+        return template.render(**context)
+
+    def render_realtime_vocab_extraction_prompt(
+        self,
+        user_transcripts: str,
+        assistant_response: str,
+        recent_conversation_history: List[str],
+        onboarding_data: OnboardingData,
+    ) -> str:
+        """Render the realtime vocabulary extraction prompt template."""
+        template = self.env.get_template("realtime_vocab_extraction_prompt.j2")
+        context = self._get_base_context(onboarding_data)
+        context.update(
+            {
+                "user_transcripts": user_transcripts,
+                "assistant_response": assistant_response,
+                "recent_conversation_history": recent_conversation_history,
+            }
+        )
         return template.render(**context)
 
 

@@ -21,6 +21,7 @@ class ConversationAgent:
         system_prompt = self.prompt_manager.render_conversation_system_prompt(
             self.onboarding_data, vocab_words, mode="text"
         )
+        self.conversation_system_prompt = system_prompt
         self.agent = self.factory.create_agent(
             result_type=ConversationResponse,
             system_prompt=system_prompt,
@@ -36,6 +37,7 @@ class ConversationAgent:
         system_prompt = self.prompt_manager.render_initial_question_prompt(
             self.onboarding_data
         )
+        self.initial_question_system_prompt = system_prompt
         question_agent = self.factory.create_agent(
             result_type=str,
             system_prompt=system_prompt,
@@ -48,12 +50,17 @@ class ConversationAgent:
         Make it personal and interesting based on what they've shared about their interests.
         """
 
+
+        result = question_agent.run_sync(prompt)
+
         logfire.info(
-            f"Generating initial question for {self.onboarding_data.name}",
+            f"Initial question agent result for {self.onboarding_data.name}",
+            result=result.data,
             prompt=prompt,
+            system_prompt=self.initial_question_system_prompt,
             onboarding_data=self.onboarding_data,
         )
-        result = question_agent.run_sync(prompt)
+
         generated_question = result.data.strip()
         return f"Hello {self.onboarding_data.name}! Let's practice your {self.onboarding_data.target_language}. {generated_question}"
 
@@ -106,9 +113,14 @@ class ConversationAgent:
             onboarding_data=self.onboarding_data,
         )
         result = self.agent.run_sync(prompt)
+
         logfire.info(
-            f"Conversation response generated for {self.onboarding_data.name}",
-            response=result.data,
+            f"Conversation agent result for {self.onboarding_data.name}",
+            result=result.data,
+            prompt=prompt,
+            system_prompt=self.conversation_system_prompt,
             onboarding_data=self.onboarding_data,
         )
+
+
         return result.data

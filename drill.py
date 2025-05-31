@@ -28,6 +28,7 @@ class VocabDrillAgent:
         self.drill_conversation_history: List[str] = []  # Track drill session history
 
         drill_agent_system_prompt = self._generate_system_prompt()
+        self.drill_agent_system_prompt = drill_agent_system_prompt
         self.agent = self.factory.create_agent(
             result_type=DrillResponse,
             system_prompt=drill_agent_system_prompt,
@@ -39,6 +40,7 @@ class VocabDrillAgent:
 
         # Create evaluation agent
         eval_agent_system_prompt = self._generate_evaluation_prompt()
+        self.eval_agent_system_prompt = eval_agent_system_prompt
         self.evaluator = self.factory.create_agent(
             result_type=AnswerEvaluation,
             system_prompt=eval_agent_system_prompt,
@@ -156,6 +158,15 @@ class VocabDrillAgent:
         )
         result = self.agent.run_sync(prompt)
 
+        logfire.info(
+            f"Drill agent result for {self.onboarding_data.name}",
+            result=result.data,
+            prompt=prompt,
+            system_prompt=self.drill_agent_system_prompt,
+            current_word=current_word,
+            onboarding_data=self.onboarding_data,
+        )
+
         # Add the generated drill to conversation history
         self.drill_conversation_history.append(
             f"VibeFluent: {result.data.drill_question}"
@@ -192,6 +203,17 @@ class VocabDrillAgent:
             expected=expected,
         )
         result = self.evaluator.run_sync(prompt)
+
+        logfire.info(
+            f"Evaluation agent result for {self.onboarding_data.name}",
+            result=result.data,
+            prompt=prompt,
+            system_prompt=self.eval_agent_system_prompt,
+            user_answer=user_answer,
+            expected=expected,
+            onboarding_data=self.onboarding_data,
+        )
+
         evaluation = result.data
 
         feedback = ""
