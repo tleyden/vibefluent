@@ -4,6 +4,7 @@ from onboarding import OnboardingData
 from models import ConversationResponse
 from database import get_database
 
+
 class ConversationAgent:
     def __init__(self, onboarding_data: OnboardingData):
         self.onboarding_data = onboarding_data
@@ -11,7 +12,6 @@ class ConversationAgent:
         self.max_history = 100
         self.factory = LLMAgentFactory()
         self.db = get_database()
-
 
         # Create the conversation agent
         self.agent = self.factory.create_agent(
@@ -41,7 +41,8 @@ class ConversationAgent:
         6. Help them practice by gently correcting errors when appropriate
         7. Keep things fairly brief, because users get overwhelmed with long messages
         8. Try to integrate some of their vocabulary words to practice into the conversation naturally, 
-           but avoid doing so if there are already multiple usage instances in the conversation history.
+           look at the conversation history and use spaced repetition techniques to give the appropriate
+           amount of repetition while still keeping things fresh.
         
         Response format:
         - assistant_message: Your main response to their message (encouraging, helpful)
