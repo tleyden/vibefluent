@@ -39,7 +39,9 @@ class RealtimeAudioConversationAgent:
         # Track response state for interruption
         self.has_active_response = False
         self.response_id = None
-        self.is_assistant_speaking = False  # Track if assistant is currently outputting audio
+        self.is_assistant_speaking = (
+            False  # Track if assistant is currently outputting audio
+        )
 
         # OpenAI API key
         self.api_key = os.getenv("OPENAI_API_KEY")
@@ -161,14 +163,16 @@ class RealtimeAudioConversationAgent:
         """Interrupt the assistant's current response when user starts speaking."""
         # Clear audio queue immediately regardless of response state
         self._clear_audio_queue()
-        
+
         # Only send cancellation if there's actually an active response
         if self.websocket and not self.websocket.closed and self.has_active_response:
             interrupt_message = {"type": "response.cancel"}
             await self.websocket.send(json.dumps(interrupt_message))
             logfire.info("Interrupted assistant response due to user speech")
         else:
-            logfire.trace("User started speaking - cleared audio queue (no active response to cancel)")
+            logfire.trace(
+                "User started speaking - cleared audio queue (no active response to cancel)"
+            )
 
     def _clear_audio_queue(self):
         """Clear all pending audio from the queue to stop playback immediately."""

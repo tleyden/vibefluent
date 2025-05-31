@@ -19,7 +19,7 @@ class ConversationAgent:
         # Create the conversation agent using template
         vocab_words = self.db.get_all_vocab_words(self.onboarding_data)
         system_prompt = self.prompt_manager.render_conversation_system_prompt(
-            self.onboarding_data, vocab_words, mode='text'
+            self.onboarding_data, vocab_words, mode="text"
         )
         self.agent = self.factory.create_agent(
             result_type=ConversationResponse,
@@ -33,7 +33,9 @@ class ConversationAgent:
     def generate_initial_question(self) -> str:
         """Generate a personalized question using the LLM based on user's interests."""
         # Create a simple agent for generating initial questions using template
-        system_prompt = self.prompt_manager.render_initial_question_prompt(self.onboarding_data)
+        system_prompt = self.prompt_manager.render_initial_question_prompt(
+            self.onboarding_data
+        )
         question_agent = self.factory.create_agent(
             result_type=str,
             system_prompt=system_prompt,
