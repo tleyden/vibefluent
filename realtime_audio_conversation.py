@@ -6,9 +6,10 @@ import pyaudio
 import threading
 import queue
 import os
+import random
 from typing import List, Optional
 from onboarding import OnboardingData
-from models import ConversationResponse
+from models import ConversationResponse, VocabWord
 from database import get_database
 from prompt_manager import get_prompt_manager
 import logfire
@@ -336,9 +337,84 @@ class RealtimeAudioConversationAgent:
                     user_transcripts=user_transcripts,
                     assistant_response=assistant_response,
                 )
+                
+                # Send vocabulary drill when words are detected
+                await self._send_vocab_drill(vocab_response.vocab_words_user_asked_about)
 
         except Exception as e:
             logfire.error(f"Error processing user transcript for vocab: {e}")
+
+    def _generate_vocab_drill(self, vocab_words: List[VocabWord]) -> str:
+        """Generate a vocabulary drill based on detected words."""
+        if not vocab_words:
+            return ""
+        
+        # Select a random word and drill type
+        vocab_word = random.choice(vocab_words)
+        drill_types = [
+            "translation",
+            "definition", 
+            "context",
+            "reverse_translation"
+        ]
+        drill_type = random.choice(drill_types)
+        
+        # Generate drill based on type and language level
+        level = self.onboarding_data.target_language_level.lower()
+        target_lang = self.onboarding_data.target_language
+        native_lang = self.onboarding_data.native_language
+        
+        if drill_type == "translation":
+            # How do you say [native word] in target language?
+            return f"Quick vocabulary practice! How do you say '{vocab_word.word_in_native_language}' in {target_lang}?"
+            
+        elif drill_type == "definition":
+            # What does [target word] mean in native language?
+            return f"Let's practice vocabulary! What does '{vocab_word.word_in_target_language}' mean in {native_lang}?"
+            
+        elif drill_type == "context":
+            # Use the word [target word] in a sentence
+            if level == "beginner":
+                return f"Can you use the word '{vocab_word.word_in_target_language}' in a simple sentence?"
+            else:
+                return f"Try using '{vocab_word.word_in_target_language}' in a sentence to show you understand it."
+                
+        elif drill_type == "reverse_translation":
+            # What's the native language word for [target word]?
+            return f"Vocabulary check! What's the {native_lang} word for '{vocab_word.word_in_target_language}'?"
+        
+        return ""
+
+    async def _send_vocab_drill(self, vocab_words: List[VocabWord]):
+        """Send a vocabulary drill via conversation.item.create."""
+        if not vocab_words or not self.websocket or self.websocket.closed:
+            return
+            
+        drill_question = self._generate_vocab_drill(vocab_words)
+        if not drill_question:
+            return
+            
+        # Create conversation item with the drill
+        drill_message = {
+            "type": "conversation.item.create",
+            "item": {
+                "type": "message",
+                "role": "assistant",
+                "content": [{"type": "text", "text": drill_question}],
+            },
+        }
+        
+        await self.websocket.send(json.dumps(drill_message))
+        
+        # Trigger response generation
+        response_message = {"type": "response.create"}
+        await self.websocket.send(json.dumps(response_message))
+        
+        logfire.info(
+            f"Vocabulary drill sent for {self.onboarding_data.name}",
+            drill_question=drill_question,
+            vocab_words=[str(word) for word in vocab_words],
+        )
 
     async def _process_websocket_message(self, data):
         """Process different types of messages from the API."""
