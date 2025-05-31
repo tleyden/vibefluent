@@ -10,8 +10,9 @@ from typing import List
 from onboarding import OnboardingData
 from models import ConversationResponse
 from database import get_database
+from prompt_manager import get_prompt_manager
 import logfire
-
+from typing import Optional
 
 class RealtimeAudioConversationAgent:
     def __init__(self, onboarding_data: OnboardingData):
@@ -19,6 +20,7 @@ class RealtimeAudioConversationAgent:
         self.conversation_history: List[str] = []
         self.max_history = 100
         self.db = get_database()
+        self.prompt_manager = get_prompt_manager()
 
         # Audio settings
         self.sample_rate = 24000
@@ -27,17 +29,19 @@ class RealtimeAudioConversationAgent:
         self.channels = 1
 
         # WebSocket and audio state
-        self.websocket = None
+        self.websocket: Optional[websockets.WebSocketClientProtocol] = None
         self.audio = pyaudio.PyAudio()
         self.is_recording = False
         self.is_playing = False
-        self.audio_queue = queue.Queue()
-        self.response_queue = queue.Queue()
+        self.audio_queue: queue.Queue = queue.Queue()
+        self.response_queue: queue.Queue = queue.Queue()
 
         # Track response state for interruption
         self.has_active_response = False
         self.response_id = None
-        self.is_assistant_speaking = False  # Track if assistant is currently outputting audio
+        self.is_assistant_speaking = (
+            False  # Track if assistant is currently outputting audio
+        )
 
         # OpenAI API key
         self.api_key = os.getenv("OPENAI_API_KEY")
@@ -56,7 +60,7 @@ class RealtimeAudioConversationAgent:
         return f"Hello {self.onboarding_data.name}! Welcome to realtime audio mode. I'll speak with you to help practice your {self.onboarding_data.target_language}. Press Enter to start recording, and I'll respond with audio. Say 'exit realtime' to return to text mode."
 
     def _create_system_message(self) -> str:
-        """Create the system message for the OpenAI Realtime API."""
+        """Create the system message for the OpenAI Realtime API using template."""
         vocab_words = self.db.get_all_vocab_words(self.onboarding_data)
         vocab_context = ""
         if vocab_words:
@@ -66,30 +70,9 @@ class RealtimeAudioConversationAgent:
             ]
             vocab_context = f"\nVocabulary words to practice: {', '.join(vocab_list)}"
 
-        return f"""
-You are a friendly, enthusiastic conversation partner helping {self.onboarding_data.name} practice {self.onboarding_data.target_language} through voice conversation.
-
-User Profile:
-- Name: {self.onboarding_data.name}
-- Native Language: {self.onboarding_data.native_language}
-- Learning Target Language: {self.onboarding_data.target_language}
-- Current Level: {self.onboarding_data.target_language_level}
-- Interests: {self.onboarding_data.conversation_interests}
-- Learning Goal: {self.onboarding_data.reason_for_learning}{vocab_context}
-
-Your role:
-1. Speak naturally and conversationally in audio responses
-2. Adapt your language complexity to their {self.onboarding_data.target_language_level} level
-3. Be encouraging and supportive of their language learning journey
-4. Ask engaging follow-up questions to keep the conversation flowing
-5. Occasionally incorporate their interests: {self.onboarding_data.conversation_interests}
-6. Help them practice by gently correcting errors when appropriate
-7. Keep responses conversational length (1-3 sentences typically)
-8. Naturally incorporate vocabulary words they're learning
-9. Respond with enthusiasm and warmth in your voice
-
-This is a voice conversation, so speak naturally as you would in person. Be encouraging and make learning fun!
-"""
+        return self.prompt_manager.render_realtime_session_config(
+            self.onboarding_data, vocab_context
+        )
 
     async def _connect_websocket(self):
         """Connect to OpenAI Realtime API via WebSocket."""
@@ -138,6 +121,11 @@ This is a voice conversation, so speak naturally as you would in person. Be enco
             },
         }
 
+        if not self.websocket or self.websocket.closed:
+            raise RuntimeError(
+                "WebSocket connection is not open. Cannot configure session."
+            )
+
         await self.websocket.send(json.dumps(config))
         logfire.info("Session configured for realtime audio")
 
@@ -180,14 +168,16 @@ This is a voice conversation, so speak naturally as you would in person. Be enco
         """Interrupt the assistant's current response when user starts speaking."""
         # Clear audio queue immediately regardless of response state
         self._clear_audio_queue()
-        
+
         # Only send cancellation if there's actually an active response
         if self.websocket and not self.websocket.closed and self.has_active_response:
             interrupt_message = {"type": "response.cancel"}
             await self.websocket.send(json.dumps(interrupt_message))
             logfire.info("Interrupted assistant response due to user speech")
         else:
-            logfire.trace("User started speaking - cleared audio queue (no active response to cancel)")
+            logfire.trace(
+                "User started speaking - cleared audio queue (no active response to cancel)"
+            )
 
     def _clear_audio_queue(self):
         """Clear all pending audio from the queue to stop playback immediately."""
@@ -372,7 +362,7 @@ This is a voice conversation, so speak naturally as you would in person. Be enco
 
     async def send_text_message(self, message: str):
         """Send a text message to the conversation (useful for commands)."""
-        if self.websocket and not self.websocket.closed:
+        if self.websocket is not None and not self.websocket.closed:
             text_message = {
                 "type": "conversation.item.create",
                 "item": {
