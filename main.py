@@ -90,6 +90,8 @@ def run_conversation_loop(onboarding_data):
                 if is_drill_mode:
                     is_drill_mode = False
                     current_drill = None
+                    # Clear drill conversation history when exiting drill mode
+                    drill_agent.drill_conversation_history = []
                     print("\n💬 Returning to Conversation Mode! 💬")
                     print(
                         "VibeFluent: Welcome back! What would you like to chat about?\n"

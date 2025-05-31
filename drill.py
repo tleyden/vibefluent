@@ -25,6 +25,7 @@ class VocabDrillAgent:
         self.db = get_database()
         self.current_vocab_words: List[VocabWord] = []
         self.current_word_index = 0
+        self.drill_conversation_history: List[str] = []  # Track drill session history
 
         drill_agent_system_prompt = self._generate_system_prompt()
         self.agent = self.factory.create_agent(
@@ -103,6 +104,7 @@ class VocabDrillAgent:
     def start_drill_session(self) -> str:
         """Start a new drill session with available vocabulary."""
         self.current_vocab_words = self.db.get_all_vocab_words(self.onboarding_data)
+        self.drill_conversation_history = []  # Reset conversation history for new session
 
         if not self.current_vocab_words:
             return "You don't have any vocabulary words to practice yet! Try having a conversation first and ask about some words."
@@ -122,6 +124,14 @@ class VocabDrillAgent:
 
         current_word = self.current_vocab_words[self.current_word_index]
 
+        # Create conversation history context
+        history_context = ""
+        if self.drill_conversation_history:
+            recent_history = self.drill_conversation_history[-10:]  # Last 10 exchanges
+            history_context = "\n\nRecent drill conversation history:\n" + "\n".join(
+                recent_history
+            )
+
         prompt = f"""
         Create a vocabulary drill for this word pair:
         - {self.onboarding_data.target_language}: {current_word.word_in_target_language}
@@ -129,19 +139,36 @@ class VocabDrillAgent:
         
         Choose one of the drill formats randomly and create an engaging question.
         Make sure it's suitable for voice interaction (no visual elements needed).
+        
+        {history_context}
+        
+        Consider the conversation history above to:
+        1. Vary the drill format from what was recently used
+        2. Build on previous context if relevant
+        3. Keep the session engaging and progressive
         """
 
         logfire.info(
             f"Generating drill for {self.onboarding_data.name}",
             prompt=prompt,
             current_word=current_word,
+            history_length=len(self.drill_conversation_history),
         )
         result = self.agent.run_sync(prompt)
+
+        # Add the generated drill to conversation history
+        self.drill_conversation_history.append(
+            f"VibeFluent: {result.data.drill_question}"
+        )
+
         self.current_word_index += 1
         return result.data
 
     def evaluate_answer(self, user_answer: str, expected: str) -> str:
         """Evaluate user's answer using LLM agent for more sophisticated judgment."""
+        # Add user's answer to conversation history
+        self.drill_conversation_history.append(f"User: {user_answer}")
+
         prompt = f"""
         Question context: The user was asked to provide: {expected}
         User's answer: "{user_answer}"
@@ -167,10 +194,16 @@ class VocabDrillAgent:
         result = self.evaluator.run_sync(prompt)
         evaluation = result.data
 
+        feedback = ""
         if evaluation.is_correct:
-            return f"Excellent! {evaluation.feedback} 🎉"
+            feedback = f"Excellent! {evaluation.feedback} 🎉"
         else:
-            return f"{evaluation.feedback} Let's keep practicing!"
+            feedback = f"{evaluation.feedback} Let's keep practicing!"
+
+        # Add feedback to conversation history
+        self.drill_conversation_history.append(f"VibeFluent: {feedback}")
+
+        return feedback
 
     def get_session_progress(self) -> str:
         """Get current progress in the drill session."""

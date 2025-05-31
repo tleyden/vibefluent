@@ -55,6 +55,9 @@ class ConversationAgent:
         - follow_up_question: An engaging question to continue the conversation
         - vocab_words_user_asked_about: Did the user explicitly ask what a word means in their current message?
                                    If so, extract vocabulary words they might want to practice.  Otherwise, leave empty.
+                                   Each word should be a word, not a phrase or sentence. 
+                                   If its a phrase, either ignore it or capture the most salient word.
+                                   If its unclear, just capture the first word that is not a preposition or article.
 
         Keep responses conversational, warm, and appropriately challenging for their level.
         """
@@ -150,4 +153,9 @@ class ConversationAgent:
             onboarding_data=self.onboarding_data,
         )
         result = self.agent.run_sync(prompt)
+        logfire.info(
+            f"Conversation response generated for {self.onboarding_data.name}",
+            response=result.data,
+            onboarding_data=self.onboarding_data,
+        )
         return result.data
