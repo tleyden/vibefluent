@@ -10,6 +10,7 @@ from typing import List
 from onboarding import OnboardingData
 from models import ConversationResponse
 from database import get_database
+from prompt_manager import get_prompt_manager
 import logfire
 
 
@@ -19,6 +20,7 @@ class RealtimeAudioConversationAgent:
         self.conversation_history: List[str] = []
         self.max_history = 100
         self.db = get_database()
+        self.prompt_manager = get_prompt_manager()
 
         # Audio settings
         self.sample_rate = 24000
@@ -56,7 +58,7 @@ class RealtimeAudioConversationAgent:
         return f"Hello {self.onboarding_data.name}! Welcome to realtime audio mode. I'll speak with you to help practice your {self.onboarding_data.target_language}. Press Enter to start recording, and I'll respond with audio. Say 'exit realtime' to return to text mode."
 
     def _create_system_message(self) -> str:
-        """Create the system message for the OpenAI Realtime API."""
+        """Create the system message for the OpenAI Realtime API using template."""
         vocab_words = self.db.get_all_vocab_words(self.onboarding_data)
         vocab_context = ""
         if vocab_words:
@@ -66,30 +68,9 @@ class RealtimeAudioConversationAgent:
             ]
             vocab_context = f"\nVocabulary words to practice: {', '.join(vocab_list)}"
 
-        return f"""
-You are a friendly, enthusiastic conversation partner helping {self.onboarding_data.name} practice {self.onboarding_data.target_language} through voice conversation.
-
-User Profile:
-- Name: {self.onboarding_data.name}
-- Native Language: {self.onboarding_data.native_language}
-- Learning Target Language: {self.onboarding_data.target_language}
-- Current Level: {self.onboarding_data.target_language_level}
-- Interests: {self.onboarding_data.conversation_interests}
-- Learning Goal: {self.onboarding_data.reason_for_learning}{vocab_context}
-
-Your role:
-1. Speak naturally and conversationally in audio responses
-2. Adapt your language complexity to their {self.onboarding_data.target_language_level} level
-3. Be encouraging and supportive of their language learning journey
-4. Ask engaging follow-up questions to keep the conversation flowing
-5. Occasionally incorporate their interests: {self.onboarding_data.conversation_interests}
-6. Help them practice by gently correcting errors when appropriate
-7. Keep responses conversational length (1-3 sentences typically)
-8. Naturally incorporate vocabulary words they're learning
-9. Respond with enthusiasm and warmth in your voice
-
-This is a voice conversation, so speak naturally as you would in person. Be encouraging and make learning fun!
-"""
+        return self.prompt_manager.render_realtime_session_config(
+            self.onboarding_data, vocab_context
+        )
 
     async def _connect_websocket(self):
         """Connect to OpenAI Realtime API via WebSocket."""

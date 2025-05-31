@@ -3,6 +3,7 @@ from llm_agent_factory import LLMAgentFactory
 from onboarding import OnboardingData
 from models import ConversationResponse
 from database import get_database
+from prompt_manager import get_prompt_manager
 import logfire
 
 
@@ -13,9 +14,13 @@ class ConversationAgent:
         self.max_history = 100
         self.factory = LLMAgentFactory()
         self.db = get_database()
+        self.prompt_manager = get_prompt_manager()
 
-        # Create the conversation agent
-        system_prompt = self._generate_system_prompt()
+        # Create the conversation agent using template
+        vocab_words = self.db.get_all_vocab_words(self.onboarding_data)
+        system_prompt = self.prompt_manager.render_conversation_system_prompt(
+            self.onboarding_data, vocab_words, mode='text'
+        )
         self.agent = self.factory.create_agent(
             result_type=ConversationResponse,
             system_prompt=system_prompt,
@@ -25,72 +30,13 @@ class ConversationAgent:
             system_prompt=system_prompt,
         )
 
-    def _generate_system_prompt(self) -> str:
-        return f"""
-        You are a friendly, enthusiastic conversation partner helping {self.onboarding_data.name} practice {self.onboarding_data.target_language}.
-        
-        User Profile:
-        - Name: {self.onboarding_data.name}
-        - Native Language: {self.onboarding_data.native_language}
-        - Learning Target Language: {self.onboarding_data.target_language}
-        - Current Level: {self.onboarding_data.target_language_level}
-        - Interests: {self.onboarding_data.conversation_interests}
-        - Learning Goal: {self.onboarding_data.reason_for_learning}
-        - Vocabulary Words To Practice: {self.db.get_all_vocab_words(self.onboarding_data)}
-        
-        Your role:
-        1. Make the conversation feel natural and enjoyable
-        2. Adapt your language complexity to their {self.onboarding_data.target_language_level} level
-        3. Be encouraging and supportive of their language learning journey
-        4. Ask engaging follow-up questions to keep the conversation flowing
-        5. Occasionally incorporate their interests: {self.onboarding_data.conversation_interests}
-        6. Help them practice by gently correcting errors when appropriate
-        7. Keep things fairly brief, because users get overwhelmed with long messages
-        8. Try to integrate some of their vocabulary words to practice into the conversation naturally, 
-           look at the conversation history and use spaced repetition techniques to give the appropriate
-           amount of repetition while still keeping things fresh.
-        
-        Response format:
-        - assistant_message: Your main response to their message (encouraging, helpful)
-        - follow_up_question: An engaging question to continue the conversation
-        - vocab_words_user_asked_about: Did the user explicitly ask what a word means in their current message?
-                                   If so, extract vocabulary words they might want to practice.  Otherwise, leave empty.
-                                   Each word should be a word, not a phrase or sentence. 
-                                   If its a phrase, either ignore it or capture the most salient word.
-                                   If its unclear, just capture the first word that is not a preposition or article.
-                                   Likewise, did the user use the wrong language for a word in their message?
-                                   For example, maybe they used a Spanish word in a Portuguese sentence, or an
-                                   English word in a German sentence.  If so, extract that word in the 
-                                   native ({self.onboarding_data.native_language}) and
-                                   target language ({self.onboarding_data.target_language}) as well.
-
-        Keep responses conversational, warm, and appropriately challenging for their level.
-        """
-
     def generate_initial_question(self) -> str:
         """Generate a personalized question using the LLM based on user's interests."""
-
-        # Create a simple agent for generating initial questions
+        # Create a simple agent for generating initial questions using template
+        system_prompt = self.prompt_manager.render_initial_question_prompt(self.onboarding_data)
         question_agent = self.factory.create_agent(
             result_type=str,
-            system_prompt=f"""
-            You are helping {self.onboarding_data.name} practice {self.onboarding_data.target_language}.
-            Generate an engaging conversation starter question that relates to their interests.
-            
-            User Profile:
-            - Learning: {self.onboarding_data.target_language} (Level: {self.onboarding_data.target_language_level})
-            - Interests: {self.onboarding_data.conversation_interests}
-            - Learning Goal: {self.onboarding_data.reason_for_learning}
-            
-            Create a friendly, engaging question that:
-            1. Relates to their stated interests: {self.onboarding_data.conversation_interests}
-            2. Is appropriate for their {self.onboarding_data.target_language_level} level
-            3. Will lead to an interesting conversation
-            4. Is open-ended and encourages them to share their thoughts/experiences
-            5. Keep things fairly brief, because users get overwhelmed with long messages
-            
-            Return only the question text, nothing else.
-            """,
+            system_prompt=system_prompt,
         )
 
         prompt = f"""
