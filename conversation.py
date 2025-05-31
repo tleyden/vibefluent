@@ -50,7 +50,6 @@ class ConversationAgent:
         Make it personal and interesting based on what they've shared about their interests.
         """
 
-
         result = question_agent.run_sync(prompt)
 
         logfire.info(
@@ -121,6 +120,5 @@ class ConversationAgent:
             system_prompt=self.conversation_system_prompt,
             onboarding_data=self.onboarding_data,
         )
-
 
         return result.data

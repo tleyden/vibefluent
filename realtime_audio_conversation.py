@@ -24,14 +24,18 @@ class RealtimeAudioConversationAgent:
         self.prompt_manager = get_prompt_manager()
         self.factory = LLMAgentFactory()
 
-        # Create vocabulary extraction agent
-        vocab_extraction_prompt = self.prompt_manager.render_vocab_extraction_prompt(
-            self.onboarding_data
+        # Create realtime conversation turn analyzer
+        conversation_turn_analysis_prompt = (
+            self.prompt_manager.render_conversation_turn_analysis_prompt(
+                self.onboarding_data
+            )
         )
-        self.vocab_extraction_system_prompt = vocab_extraction_prompt
-        self.vocab_extractor = self.factory.create_agent(
+        self.conversation_turn_analysis_system_prompt = (
+            conversation_turn_analysis_prompt
+        )
+        self.realtime_conversation_turn_analyzer = self.factory.create_agent(
             result_type=ConversationResponse,
-            system_prompt=vocab_extraction_prompt,
+            system_prompt=conversation_turn_analysis_prompt,
         )
 
         # Audio settings
@@ -300,22 +304,24 @@ class RealtimeAudioConversationAgent:
             # Combine user transcripts into a single context
             user_input = " ".join(user_transcripts)
 
-            # Use prompt manager to render the realtime vocab extraction prompt
-            prompt = self.prompt_manager.render_realtime_vocab_extraction_prompt(
-                user_transcripts=user_input,
-                assistant_response=assistant_response,
-                recent_conversation_history=recent_history,
-                onboarding_data=self.onboarding_data,
+            # Use prompt manager to render the realtime conversation turn analysis prompt
+            prompt = (
+                self.prompt_manager.render_realtime_conversation_turn_analysis_prompt(
+                    user_transcripts=user_input,
+                    assistant_response=assistant_response,
+                    recent_conversation_history=recent_history,
+                    onboarding_data=self.onboarding_data,
+                )
             )
 
             # Use async version instead of sync
-            result = await self.vocab_extractor.run(prompt)
+            result = await self.realtime_conversation_turn_analyzer.run(prompt)
 
             logfire.info(
-                f"Vocab extractor agent result for {self.onboarding_data.name}",
+                f"Realtime conversation turn analyzer result for {self.onboarding_data.name}",
                 result=result.data,
                 prompt=prompt,
-                system_prompt=self.vocab_extraction_system_prompt,
+                system_prompt=self.conversation_turn_analysis_system_prompt,
                 onboarding_data=self.onboarding_data,
             )
 
