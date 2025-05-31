@@ -84,10 +84,43 @@ class RealtimeAudioConversationAgent:
                 for w in vocab_words[:20]
             ]
             vocab_context = f"\nVocabulary words to practice: {', '.join(vocab_list)}"
+            
+            # Add vocab drill instructions
+            vocab_context += self._generate_vocab_drill_instructions(vocab_words)
 
         return self.prompt_manager.render_realtime_session_config(
             self.onboarding_data, vocab_context
         )
+
+    def _generate_vocab_drill_instructions(self, vocab_words) -> str:
+        """Generate instructions for vocabulary drills in the realtime session."""
+        if not vocab_words:
+            return ""
+            
+        vocab_list = [f"{w.word_in_target_language} ({w.word_in_native_language})" for w in vocab_words[:20]]
+        
+        drill_instructions = f"""
+
+VOCABULARY DRILL INSTRUCTIONS:
+You have access to these vocabulary words: {', '.join(vocab_list)}
+
+Generate vocabulary drills using these types:
+1. TRANSLATION DRILLS: Ask the user to translate words from {self.onboarding_data.native_language} to {self.onboarding_data.target_language} or vice versa
+2. CONTEXT DRILLS: Ask the user to use a vocabulary word in a sentence
+3. DEFINITION DRILLS: Give a definition and ask the user to identify the word
+4. SYNONYM/ANTONYM DRILLS: Ask for words with similar or opposite meanings
+5. FILL-IN-THE-BLANK: Provide sentences with missing vocabulary words
+6. PRONUNCIATION DRILLS: Focus on correct pronunciation of specific words
+
+During the conversation, naturally incorporate these drills by:
+- Asking "Can you translate [word] to {self.onboarding_data.target_language}?"
+- Saying "Use the word '[word]' in a sentence"
+- Providing definitions and asking "What word am I describing?"
+- Creating context-based scenarios using the vocabulary
+
+Mix drill types to keep the session engaging and adaptive to the user's responses."""
+        
+        return drill_instructions
 
     async def _connect_websocket(self):
         """Connect to OpenAI Realtime API via WebSocket."""
@@ -497,6 +530,30 @@ class RealtimeAudioConversationAgent:
             # Trigger response generation
             response_message = {"type": "response.create"}
             await self.websocket.send(json.dumps(response_message))
+
+    async def start_vocab_drill_session(self):
+        """Start a focused vocabulary drill session."""
+        if not await self._connect_websocket():
+            return False
+
+        # Store event loop for thread communication
+        self.loop = asyncio.get_event_loop()
+
+        # Send an initial text message to start vocab drills
+        await self.send_text_message(
+            f"Let's start a vocabulary drill session! I'll help you practice the words you've been learning in {self.onboarding_data.target_language}."
+        )
+
+        # Start audio streams
+        self.is_recording = True
+        self.is_playing = True
+        self._start_audio_input_stream()
+        self._start_audio_output_stream()
+
+        # Start handling WebSocket messages
+        await self._handle_websocket_messages()
+
+        return True
 
     def __del__(self):
         """Cleanup audio resources."""
