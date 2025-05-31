@@ -5,6 +5,19 @@ from database import get_database
 from dotenv import load_dotenv
 import logfire
 import os
+import readline
+
+
+def get_user_input(prompt: str = "You: ") -> str:
+    """Get user input with better handling for different environments."""
+    try:
+        # Flush output to ensure prompt appears
+        print(prompt, end="", flush=True)
+        readline.get_history_length()  # Just make sure readline isn't removed from imports
+        user_input = input().strip()
+        return user_input
+    except (EOFError, KeyboardInterrupt):
+        return ""
 
 
 def run_conversation_loop(onboarding_data):
@@ -31,8 +44,8 @@ def run_conversation_loop(onboarding_data):
 
     while True:
         try:
-            # Get user input
-            user_input = input("You: ").strip()
+            # Get user input with improved handling
+            user_input = get_user_input("You: ")
 
             # Check for exit commands
             if user_input.lower() in ["quit", "exit", "q"]:
