@@ -6,13 +6,15 @@ import pyaudio
 import threading
 import queue
 import os
+import random
 from typing import List, Optional
 from onboarding import OnboardingData
-from models import ConversationResponse
+from models import ConversationResponse, VocabWord
 from database import get_database
 from prompt_manager import get_prompt_manager
 import logfire
 from llm_agent_factory import LLMAgentFactory
+from constants import DO_VOCAB_DRILLS
 
 
 class RealtimeAudioConversationAgent:
@@ -64,6 +66,11 @@ class RealtimeAudioConversationAgent:
 
         # Track pending user transcripts for vocabulary processing
         self.pending_user_transcripts: List[str] = []
+
+        # Vocabulary drill system
+        self.pending_drills: List[dict] = []  # Queue of drills to execute
+        self.current_drill: Optional[dict] = None  # Currently active drill
+        self.is_in_drill_mode = False
 
         logfire.info(
             f"RealtimeAudioConversationAgent initialized for {self.onboarding_data.name}",
@@ -279,6 +286,127 @@ class RealtimeAudioConversationAgent:
             except Exception as e:
                 logfire.error(f"WebSocket message handling error: {e}")
 
+    def _generate_vocab_drill(self, vocab_word: VocabWord) -> dict:
+        """Generate a vocabulary drill based on a detected word."""
+        drill_types = ["translation", "definition", "context", "reverse_translation"]
+        drill_type = random.choice(drill_types)
+
+        # Generate drill based on type and language level
+        level = self.onboarding_data.target_language_level.lower()
+        target_lang = self.onboarding_data.target_language
+        native_lang = self.onboarding_data.native_language
+
+        if drill_type == "translation":
+            # How do you say [native word] in target language?
+            question = f"How do you say '{vocab_word.word_in_native_language}' in {target_lang}?"
+            expected_answer = vocab_word.word_in_target_language
+
+        elif drill_type == "definition":
+            # What does [target word] mean in native language?
+            question = f"What does '{vocab_word.word_in_target_language}' mean in {native_lang}?"
+            expected_answer = vocab_word.word_in_native_language
+
+        elif drill_type == "context":
+            # Use the word [target word] in a sentence
+            if level == "beginner":
+                question = f"Can you use the word '{vocab_word.word_in_target_language}' in a simple sentence?"
+            else:
+                question = f"Try using '{vocab_word.word_in_target_language}' in a sentence to show you understand it."
+            expected_answer = (
+                f"Any sentence containing '{vocab_word.word_in_target_language}'"
+            )
+
+        elif drill_type == "reverse_translation":
+            # What's the native language word for [target word]?
+            question = f"What's the {native_lang} word for '{vocab_word.word_in_target_language}'?"
+            expected_answer = vocab_word.word_in_native_language
+
+        return {
+            "type": drill_type,
+            "question": question,
+            "expected_answer": expected_answer,
+            "vocab_word": vocab_word,
+        }
+
+    async def _send_drill_instructions(self, num_drills: int):
+        """Send instructions about the upcoming vocabulary drills."""
+        instructions = f"Great! I detected {num_drills} vocabulary word{'s' if num_drills > 1 else ''} you asked about. Let's practice {'them' if num_drills > 1 else 'it'} with some quick drills. I'll ask you a question about each word - just answer naturally!"
+
+        drill_message = {
+            "type": "conversation.item.create",
+            "item": {
+                "type": "message",
+                "role": "assistant",
+                "content": [{"type": "text", "text": instructions}],
+            },
+        }
+
+        await self.websocket.send(json.dumps(drill_message))
+
+        # Trigger response generation
+        response_message = {"type": "response.create"}
+        await self.websocket.send(json.dumps(response_message))
+
+        logfire.info(
+            f"Drill instructions sent for {self.onboarding_data.name}",
+            instructions=instructions,
+            num_drills=num_drills,
+        )
+
+    async def _send_vocab_drill(self, drill: dict):
+        """Send a vocabulary drill via conversation.item.create."""
+        if not self.websocket or self.websocket.closed:
+            return
+
+        drill_question = drill["question"]
+
+        # Create conversation item with the drill
+        drill_message = {
+            "type": "conversation.item.create",
+            "item": {
+                "type": "message",
+                "role": "assistant",
+                "content": [{"type": "text", "text": drill_question}],
+            },
+        }
+
+        await self.websocket.send(json.dumps(drill_message))
+
+        # Trigger response generation
+        response_message = {"type": "response.create"}
+        await self.websocket.send(json.dumps(response_message))
+
+        logfire.info(
+            f"Vocabulary drill sent for {self.onboarding_data.name}",
+            drill_question=drill_question,
+            drill_type=drill["type"],
+            vocab_word=str(drill["vocab_word"]),
+        )
+
+    async def _send_drill_completion_message(self):
+        """Send a message when all drills are completed."""
+        completion_message = "Excellent work! You've completed all the vocabulary drills. Those words should stick better now. Let's continue our conversation!"
+
+        drill_message = {
+            "type": "conversation.item.create",
+            "item": {
+                "type": "message",
+                "role": "assistant",
+                "content": [{"type": "text", "text": completion_message}],
+            },
+        }
+
+        await self.websocket.send(json.dumps(drill_message))
+
+        # Trigger response generation
+        response_message = {"type": "response.create"}
+        await self.websocket.send(json.dumps(response_message))
+
+        logfire.info(
+            f"Drill completion message sent for {self.onboarding_data.name}",
+            completion_message=completion_message,
+        )
+
     async def _process_user_transcript(
         self,
         user_transcripts: List[str],
@@ -336,6 +464,28 @@ class RealtimeAudioConversationAgent:
                     user_transcripts=user_transcripts,
                     assistant_response=assistant_response,
                 )
+
+                # Only generate and send drills if the feature is enabled
+                if DO_VOCAB_DRILLS:
+                    # Generate drills for detected vocabulary words
+                    new_drills = []
+                    for vocab_word in vocab_response.vocab_words_user_asked_about:
+                        drill = self._generate_vocab_drill(vocab_word)
+                        new_drills.append(drill)
+
+                    # Add to pending drills queue
+                    self.pending_drills.extend(new_drills)
+
+                    # If not already in drill mode, start drill sequence
+                    if not self.is_in_drill_mode and self.pending_drills:
+                        self.is_in_drill_mode = True
+
+                        # Send instructions about the drills
+                        await self._send_drill_instructions(len(new_drills))
+
+                        # Start first drill
+                        self.current_drill = self.pending_drills.pop(0)
+                        await self._send_vocab_drill(self.current_drill)
 
         except Exception as e:
             logfire.error(f"Error processing user transcript for vocab: {e}")
@@ -412,8 +562,22 @@ class RealtimeAudioConversationAgent:
                 self.conversation_history.append(f"User: {transcript}")
                 logfire.info(f"User transcript: {transcript}")
 
-                # Add transcript to pending list for processing after assistant responds
-                self.pending_user_transcripts.append(transcript)
+                # If drills are enabled and in drill mode, process drill response
+                if DO_VOCAB_DRILLS and self.is_in_drill_mode and self.current_drill:
+                    logfire.info(f"Processing drill response: {transcript}")
+
+                    # Move to next drill or complete drill sequence
+                    if self.pending_drills:
+                        self.current_drill = self.pending_drills.pop(0)
+                        await self._send_vocab_drill(self.current_drill)
+                    else:
+                        # All drills completed
+                        self.is_in_drill_mode = False
+                        self.current_drill = None
+                        await self._send_drill_completion_message()
+                else:
+                    # Add transcript to pending list for processing after assistant responds
+                    self.pending_user_transcripts.append(transcript)
 
         elif message_type == "response.cancelled":
             # Assistant response was cancelled (due to interruption)

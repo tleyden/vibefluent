@@ -8,3 +8,6 @@ DUMP_RAW_LLM_OUTPUT = False
 
 # To enable realtime audio mode, change MODE to:
 MODE = "REALTIME_AUDIO"
+
+# Vocabulary drill feature flag
+DO_VOCAB_DRILLS = True  # Set to False to disable vocabulary drills
