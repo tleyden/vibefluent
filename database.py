@@ -120,7 +120,11 @@ class Database:
         """Get all vocabulary words as VocabWord instances."""
         from models import VocabWord
 
-        records = self.session.query(VocabRecord).order_by(VocabRecord.created_at.desc()).all()
+        records = (
+            self.session.query(VocabRecord)
+            .order_by(VocabRecord.created_at.desc())
+            .all()
+        )
 
         vocab_words = []
         for record in records:
