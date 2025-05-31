@@ -295,30 +295,17 @@ class RealtimeAudioConversationAgent:
                 if len(conversation_history) > 5
                 else conversation_history
             )
-            history_context = (
-                "\n".join(recent_history)
-                if recent_history
-                else "No previous conversation"
-            )
 
             # Combine user transcripts into a single context
             user_input = " ".join(user_transcripts)
 
-            # Use LLM to detect vocabulary requests with full context
-            prompt = f"""
-            Recent conversation history:
-            {history_context}
-            
-            User transcript(s): "{user_input}"
-            Assistant response: "{assistant_response}"
-            
-            Analyze this conversation exchange to see if the user is explicitly asking about vocabulary words.
-            If they are asking how to say something, what a word means, or similar vocabulary questions,
-            extract those words in both {self.onboarding_data.native_language} and {self.onboarding_data.target_language}.
-            
-            Consider both the user's question and the assistant's response to understand what vocabulary was being discussed.
-            Only extract words they specifically asked about, not every word they used.
-            """
+            # Use prompt manager to render the realtime vocab extraction prompt
+            prompt = self.prompt_manager.render_realtime_vocab_extraction_prompt(
+                user_transcripts=user_input,
+                assistant_response=assistant_response,
+                recent_conversation_history=recent_history,
+                onboarding_data=self.onboarding_data
+            )
 
             # Use async version instead of sync
             result = await self.vocab_extractor.run(prompt)
