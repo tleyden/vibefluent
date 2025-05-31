@@ -304,7 +304,6 @@ class RealtimeAudioConversationAgent:
             # Combine user transcripts into a single context
             user_input = " ".join(user_transcripts)
 
-            # Use prompt manager to render the realtime conversation turn analysis prompt
             prompt = (
                 self.prompt_manager.render_realtime_conversation_turn_analysis_prompt(
                     user_transcripts=user_input,
@@ -314,7 +313,6 @@ class RealtimeAudioConversationAgent:
                 )
             )
 
-            # Use async version instead of sync
             result = await self.realtime_conversation_turn_analyzer.run(prompt)
 
             logfire.info(
