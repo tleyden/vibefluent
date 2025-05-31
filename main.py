@@ -49,7 +49,6 @@ def run_conversation_loop(onboarding_data):
                 current_drill = drill_agent.get_next_drill()
                 if current_drill:
                     print(f"VibeFluent: {current_drill.drill_question}")
-                    print(f"Hint: {current_drill.encouragement}\n")
                 continue
 
             if user_input.lower() in ["exit drill", "conversation mode", "end drill"]:
@@ -76,7 +75,6 @@ def run_conversation_loop(onboarding_data):
                     current_drill = drill_agent.get_next_drill()
                     if current_drill:
                         print(f"\nVibeFluent: {current_drill.drill_question}")
-                        print(f"Hint: {current_drill.encouragement}\n")
                     else:
                         print(f"\nVibeFluent: {drill_agent.get_session_progress()}")
                         print(
@@ -94,7 +92,6 @@ def run_conversation_loop(onboarding_data):
                         current_drill = drill_agent.get_next_drill()
                         if current_drill:
                             print(f"\nVibeFluent: {current_drill.drill_question}")
-                            print(f"Hint: {current_drill.encouragement}\n")
                         else:
                             print(f"\n{drill_agent.get_session_progress()}")
                             print(

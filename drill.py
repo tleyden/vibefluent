@@ -10,7 +10,6 @@ from pydantic import BaseModel
 class DrillResponse(BaseModel):
     drill_question: str
     expected_answer: str
-    encouragement: str
 
 
 class VocabDrillAgent:
@@ -51,7 +50,6 @@ class VocabDrillAgent:
         Response format:
         - drill_question: The question/prompt for the user (voice-friendly)
         - expected_answer: The correct answer you're looking for
-        - encouragement: Brief encouraging phrase to motivate them
         
         Keep everything concise and voice-interaction friendly.
         """
@@ -109,7 +107,6 @@ class VocabDrillAgent:
             return DrillResponse(
                 drill_question=question,
                 expected_answer=expected,
-                encouragement="You've got this!",
             )
 
     def evaluate_answer(self, user_answer: str, expected: str) -> str:
