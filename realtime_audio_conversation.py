@@ -71,6 +71,7 @@ class RealtimeAudioConversationAgent:
         self.pending_drills: List[dict] = []  # Queue of drills to execute
         self.current_drill: Optional[dict] = None  # Currently active drill
         self.is_in_drill_mode = False
+        self.initial_drills_started = False  # Track if we've started initial drills
 
         logfire.info(
             f"RealtimeAudioConversationAgent initialized for {self.onboarding_data.name}",
@@ -328,9 +329,54 @@ class RealtimeAudioConversationAgent:
             "vocab_word": vocab_word,
         }
 
+    async def _start_initial_vocab_drills(self):
+        """Start vocabulary drills with all existing words when drills are enabled."""
+        if not DO_VOCAB_DRILLS or self.initial_drills_started:
+            return
+
+        # Get all existing vocabulary words
+        existing_vocab_words = self.db.get_all_vocab_words(self.onboarding_data)
+
+        if not existing_vocab_words:
+            logfire.info(f"No existing vocabulary words found for {self.onboarding_data.name}")
+            return
+
+        logfire.info(
+            f"Starting initial vocabulary drills for {self.onboarding_data.name} with {len(existing_vocab_words)} words",
+            vocab_words=[str(word) for word in existing_vocab_words],
+        )
+
+        # Generate drills for all existing vocabulary words
+        new_drills = []
+        for vocab_word in existing_vocab_words:
+            drill = self._generate_vocab_drill(vocab_word)
+            new_drills.append(drill)
+
+        # Shuffle for variety
+        random.shuffle(new_drills)
+
+        # Add to pending drills queue
+        self.pending_drills.extend(new_drills)
+
+        # Start drill sequence
+        self.is_in_drill_mode = True
+        self.initial_drills_started = True
+
+        # Send instructions about the drills
+        await self._send_drill_instructions(len(new_drills))
+
+        # Start first drill
+        if self.pending_drills:
+            self.current_drill = self.pending_drills.pop(0)
+            await self._send_vocab_drill(self.current_drill)
+
     async def _send_drill_instructions(self, num_drills: int):
         """Send instructions about the upcoming vocabulary drills."""
-        instructions = f"Great! I detected {num_drills} vocabulary word{'s' if num_drills > 1 else ''} you asked about. Let's practice {'them' if num_drills > 1 else 'it'} with some quick drills. I'll ask you a question about each word - just answer naturally!"
+        if self.initial_drills_started and not hasattr(self, '_sent_initial_instructions'):
+            instructions = f"Welcome! I found {num_drills} vocabulary word{'s' if num_drills > 1 else ''} in your learning profile. Let's practice {'them' if num_drills > 1 else 'it'} with some quick drills before we start our conversation. I'll ask you a question about each word - just answer naturally!"
+            self._sent_initial_instructions = True
+        else:
+            instructions = f"Great! I detected {num_drills} vocabulary word{'s' if num_drills > 1 else ''} you asked about. Let's practice {'them' if num_drills > 1 else 'it'} with some quick drills. I'll ask you a question about each word - just answer naturally!"
 
         drill_message = {
             "type": "conversation.item.create",
@@ -385,7 +431,11 @@ class RealtimeAudioConversationAgent:
 
     async def _send_drill_completion_message(self):
         """Send a message when all drills are completed."""
-        completion_message = "Excellent work! You've completed all the vocabulary drills. Those words should stick better now. Let's continue our conversation!"
+        if self.initial_drills_started and not hasattr(self, '_completed_initial_drills'):
+            completion_message = "Excellent work! You've completed all your vocabulary practice drills. Those words should stick better now. Now let's have a natural conversation - feel free to ask me about any new words you'd like to learn!"
+            self._completed_initial_drills = True
+        else:
+            completion_message = "Excellent work! You've completed all the vocabulary drills. Those words should stick better now. Let's continue our conversation!"
 
         drill_message = {
             "type": "conversation.item.create",
@@ -465,8 +515,12 @@ class RealtimeAudioConversationAgent:
                     assistant_response=assistant_response,
                 )
 
-                # Only generate and send drills if the feature is enabled
-                if DO_VOCAB_DRILLS:
+                # Only generate and send drills for new words if the feature is enabled and we're not already in drill mode
+                if DO_VOCAB_DRILLS and not self.is_in_drill_mode:
+                    logfire.info(
+                        f"Generating drills for newly detected vocabulary words: {', '.join(str(word) for word in vocab_response.vocab_words_user_asked_about)}",
+                        onboarding_data=self.onboarding_data,
+                    )
                     # Generate drills for detected vocabulary words
                     new_drills = []
                     for vocab_word in vocab_response.vocab_words_user_asked_about:
@@ -476,16 +530,15 @@ class RealtimeAudioConversationAgent:
                     # Add to pending drills queue
                     self.pending_drills.extend(new_drills)
 
-                    # If not already in drill mode, start drill sequence
-                    if not self.is_in_drill_mode and self.pending_drills:
-                        self.is_in_drill_mode = True
+                    # Start drill sequence
+                    self.is_in_drill_mode = True
 
-                        # Send instructions about the drills
-                        await self._send_drill_instructions(len(new_drills))
+                    # Send instructions about the drills
+                    await self._send_drill_instructions(len(new_drills))
 
-                        # Start first drill
-                        self.current_drill = self.pending_drills.pop(0)
-                        await self._send_vocab_drill(self.current_drill)
+                    # Start first drill
+                    self.current_drill = self.pending_drills.pop(0)
+                    await self._send_vocab_drill(self.current_drill)
 
         except Exception as e:
             logfire.error(f"Error processing user transcript for vocab: {e}")
@@ -578,6 +631,10 @@ class RealtimeAudioConversationAgent:
                 else:
                     # Add transcript to pending list for processing after assistant responds
                     self.pending_user_transcripts.append(transcript)
+
+                # Start initial vocab drills after first user interaction if not already started
+                if DO_VOCAB_DRILLS and not self.initial_drills_started and not self.is_in_drill_mode:
+                    await self._start_initial_vocab_drills()
 
         elif message_type == "response.cancelled":
             # Assistant response was cancelled (due to interruption)
