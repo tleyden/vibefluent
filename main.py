@@ -197,7 +197,7 @@ def run_conversation_loop(onboarding_data):
 def main():
     # Set up signal handler for Ctrl+C
     signal.signal(signal.SIGINT, signal_handler)
-    
+
     load_dotenv()
 
     # Initialize logfire
