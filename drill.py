@@ -158,7 +158,6 @@ class VocabDrillAgent:
         )
         result = self.agent.run_sync(prompt)
 
-        # Log the agent call result
         logfire.info(
             f"Drill agent result for {self.onboarding_data.name}",
             result=result.data,
@@ -205,7 +204,6 @@ class VocabDrillAgent:
         )
         result = self.evaluator.run_sync(prompt)
 
-        # Log the agent call result
         logfire.info(
             f"Evaluation agent result for {self.onboarding_data.name}",
             result=result.data,

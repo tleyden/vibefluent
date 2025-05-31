@@ -311,7 +311,6 @@ class RealtimeAudioConversationAgent:
             # Use async version instead of sync
             result = await self.vocab_extractor.run(prompt)
 
-            # Log the agent call result
             logfire.info(
                 f"Vocab extractor agent result for {self.onboarding_data.name}",
                 result=result.data,

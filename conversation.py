@@ -53,7 +53,6 @@ class ConversationAgent:
 
         result = question_agent.run_sync(prompt)
 
-        # Log the agent call result
         logfire.info(
             f"Initial question agent result for {self.onboarding_data.name}",
             result=result.data,
@@ -115,7 +114,6 @@ class ConversationAgent:
         )
         result = self.agent.run_sync(prompt)
 
-        # Log the agent call result
         logfire.info(
             f"Conversation agent result for {self.onboarding_data.name}",
             result=result.data,
