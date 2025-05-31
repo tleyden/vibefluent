@@ -2,7 +2,7 @@ from typing import List
 from llm_agent_factory import LLMAgentFactory
 from onboarding import OnboardingData
 from models import ConversationResponse
-
+from database import get_database
 
 class ConversationAgent:
     def __init__(self, onboarding_data: OnboardingData):
@@ -10,6 +10,8 @@ class ConversationAgent:
         self.conversation_history: List[str] = []
         self.max_history = 100
         self.factory = LLMAgentFactory()
+        self.db = get_database()
+
 
         # Create the conversation agent
         self.agent = self.factory.create_agent(
@@ -28,6 +30,7 @@ class ConversationAgent:
         - Current Level: {self.onboarding_data.target_language_level}
         - Interests: {self.onboarding_data.conversation_interests}
         - Learning Goal: {self.onboarding_data.reason_for_learning}
+        - Vocabulary Words To Practice: {self.db.get_all_vocab_words()}
         
         Your role:
         1. Make the conversation feel natural and enjoyable
@@ -37,6 +40,8 @@ class ConversationAgent:
         5. Occasionally incorporate their interests: {self.onboarding_data.conversation_interests}
         6. Help them practice by gently correcting errors when appropriate
         7. Keep things fairly brief, because users get overwhelmed with long messages
+        8. Try to integrate some of their vocabulary words to practice into the conversation naturally, 
+           but avoid doing so if there are already multiple usage instances in the conversation history.
         
         Response format:
         - assistant_message: Your main response to their message (encouraging, helpful)
