@@ -34,6 +34,11 @@ class RealtimeAudioConversationAgent:
         self.audio_queue = queue.Queue()
         self.response_queue = queue.Queue()
 
+        # Track response state for interruption
+        self.has_active_response = False
+        self.response_id = None
+        self.is_assistant_speaking = False  # Track if assistant is currently outputting audio
+
         # OpenAI API key
         self.api_key = os.getenv("OPENAI_API_KEY")
         if not self.api_key:
@@ -171,6 +176,31 @@ This is a voice conversation, so speak naturally as you would in person. Be enco
             message = {"type": "input_audio_buffer.append", "audio": audio_b64}
             await self.websocket.send(json.dumps(message))
 
+    async def _interrupt_assistant(self):
+        """Interrupt the assistant's current response when user starts speaking."""
+        # Clear audio queue immediately regardless of response state
+        self._clear_audio_queue()
+        
+        # Only send cancellation if there's actually an active response
+        if self.websocket and not self.websocket.closed and self.has_active_response:
+            interrupt_message = {"type": "response.cancel"}
+            await self.websocket.send(json.dumps(interrupt_message))
+            logfire.info("Interrupted assistant response due to user speech")
+        else:
+            logfire.trace("User started speaking - cleared audio queue (no active response to cancel)")
+
+    def _clear_audio_queue(self):
+        """Clear all pending audio from the queue to stop playback immediately."""
+        cleared_count = 0
+        while not self.audio_queue.empty():
+            try:
+                self.audio_queue.get_nowait()
+                cleared_count += 1
+            except queue.Empty:
+                break
+        if cleared_count > 0:
+            logfire.trace(f"Cleared {cleared_count} audio chunks from queue")
+
     def _start_audio_output_stream(self):
         """Start playing audio from the response queue."""
 
@@ -219,11 +249,12 @@ This is a voice conversation, so speak naturally as you would in person. Be enco
         message_type = data.get("type")
 
         if message_type == "response.audio.delta":
-            # Received audio chunk
+            # Received audio chunk - only queue if we're not being interrupted
             audio_b64 = data.get("delta")
             if audio_b64:
                 audio_data = base64.b64decode(audio_b64)
                 self.audio_queue.put(audio_data)
+                self.is_assistant_speaking = True
 
         elif message_type == "response.audio_transcript.delta":
             # Received transcript chunk
@@ -239,8 +270,31 @@ This is a voice conversation, so speak naturally as you would in person. Be enco
                 self.conversation_history.append(f"Assistant: {transcript}")
                 logfire.info(f"Assistant transcript: {transcript}")
 
+        elif message_type == "response.created":
+            # Response generation started
+            self.has_active_response = True
+            self.response_id = data.get("response", {}).get("id")
+            self.is_assistant_speaking = False
+            logfire.trace(f"Response started: {self.response_id}")
+
+        elif message_type == "response.done":
+            # Response generation completed
+            self.has_active_response = False
+            self.response_id = None
+            self.is_assistant_speaking = False
+            logfire.trace("Response completed")
+
+        elif message_type == "response.output_item.done":
+            # Audio output item completed
+            output_item = data.get("item", {})
+            if output_item.get("type") == "message":
+                self.is_assistant_speaking = False
+                logfire.trace("Audio output completed")
+
         elif message_type == "input_audio_buffer.speech_started":
             logfire.trace("User started speaking")
+            # Always interrupt - clear audio immediately and try to cancel if possible
+            await self._interrupt_assistant()
 
         elif message_type == "input_audio_buffer.speech_stopped":
             logfire.trace("User stopped speaking")
@@ -252,9 +306,22 @@ This is a voice conversation, so speak naturally as you would in person. Be enco
                 self.conversation_history.append(f"User: {transcript}")
                 logfire.info(f"User transcript: {transcript}")
 
+        elif message_type == "response.cancelled":
+            # Assistant response was cancelled (due to interruption)
+            logfire.info("Assistant response was cancelled")
+            self.has_active_response = False
+            self.response_id = None
+            self.is_assistant_speaking = False
+            # Clear any remaining audio in the queue to stop playback immediately
+            self._clear_audio_queue()
+
         elif message_type == "error":
             error_msg = data.get("error", {}).get("message", "Unknown error")
-            logfire.error(f"API error: {error_msg}")
+            # Don't log cancellation errors as errors - they're expected during interruption
+            if "Cancellation failed" in error_msg:
+                logfire.trace(f"Cancellation attempt failed (expected): {error_msg}")
+            else:
+                logfire.error(f"API error: {error_msg}")
 
     async def start_conversation(self):
         """Start the realtime audio conversation."""
