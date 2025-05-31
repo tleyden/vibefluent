@@ -13,6 +13,7 @@ def run_conversation_loop(onboarding_data):
     print("🌍 Welcome to your conversation practice! 🌍")
     print("Type 'quit' or 'exit' to end the conversation")
     print("Type 'drill mode' to enter vocabulary drill mode")
+    print("Type 're-onboard' to update your profile settings")
     print("=" * 60 + "\n")
 
     # Initialize agents and database
@@ -39,6 +40,38 @@ def run_conversation_loop(onboarding_data):
                     f"\nGoodbye, {onboarding_data.name}! Keep practicing your {onboarding_data.target_language}! 🎉"
                 )
                 break
+
+            # Check for re-onboard command
+            if user_input == "re-onboard":
+                print("\n🔄 Re-onboarding Mode! 🔄")
+                print("Let's update your profile settings...")
+
+                # Delete existing onboarding data
+                db.delete_onboarding_data()
+
+                # Run onboarding again
+                from onboarding import run_onboarding
+
+                new_onboarding_data = run_onboarding()
+
+                print(f"\nProfile updated successfully, {new_onboarding_data.name}!")
+                print(
+                    f"Now ready to help you learn {new_onboarding_data.target_language}!"
+                )
+
+                # Reinitialize agents with new data
+                conversation_agent = ConversationAgent(new_onboarding_data)
+                drill_agent = VocabDrillAgent(new_onboarding_data)
+                onboarding_data = new_onboarding_data
+
+                # Reset drill mode state
+                is_drill_mode = False
+                current_drill = None
+
+                # Generate new initial question
+                initial_question = conversation_agent.generate_initial_question()
+                print(f"\nVibeFluent: {initial_question}\n")
+                continue
 
             # Check for mode switching commands
             if user_input.lower() in ["drill mode", "start drill", "drill"]:

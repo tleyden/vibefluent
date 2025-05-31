@@ -73,6 +73,11 @@ class Database:
             )
         return None
 
+    def delete_onboarding_data(self) -> None:
+        """Delete all onboarding data from SQLite."""
+        self.session.query(OnboardingRecord).delete()
+        self.session.commit()
+
     def save_vocab_words(
         self, vocab_words: List[VocabWord], native_language: str, target_language: str
     ) -> None:
