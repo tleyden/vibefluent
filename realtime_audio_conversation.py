@@ -304,7 +304,7 @@ class RealtimeAudioConversationAgent:
                 user_transcripts=user_input,
                 assistant_response=assistant_response,
                 recent_conversation_history=recent_history,
-                onboarding_data=self.onboarding_data
+                onboarding_data=self.onboarding_data,
             )
 
             # Use async version instead of sync
