@@ -4,9 +4,18 @@ from llm_agent_factory import LLMAgentFactory
 from onboarding import OnboardingData
 
 
+class VocabWord(BaseModel):
+    word_in_target_language: str
+    word_in_native_language: str
+
+    def __str__(self):
+        return f"{self.word_in_target_language} ({self.word_in_native_language})"
+
+
 class ConversationResponse(BaseModel):
     assistant_message: str
     follow_up_question: str
+    vocab_words_to_practice: List[VocabWord] = []
 
 
 class ConversationAgent:
@@ -29,7 +38,7 @@ class ConversationAgent:
         User Profile:
         - Name: {self.onboarding_data.name}
         - Native Language: {self.onboarding_data.native_language}
-        - Learning: {self.onboarding_data.target_language}
+        - Learning Target Language: {self.onboarding_data.target_language}
         - Current Level: {self.onboarding_data.target_language_level}
         - Interests: {self.onboarding_data.conversation_interests}
         - Learning Goal: {self.onboarding_data.reason_for_learning}
@@ -46,7 +55,10 @@ class ConversationAgent:
         Response format:
         - assistant_message: Your main response to their message (encouraging, helpful)
         - follow_up_question: An engaging question to continue the conversation
-        
+        - vocab_words_to_practice: Up to 3 vocabulary words or phrases to practice, 
+                                   but only words the user explicitly mentions.  Do not suggest 
+                                   related or periphery vocab words. 
+
         Keep responses conversational, warm, and appropriately challenging for their level.
         """
 
@@ -114,7 +126,7 @@ class ConversationAgent:
         prompt = f"""
         The user just said: "{user_message}"
         
-        {recent_context}
+        with recent context: {recent_context}
         
         Please respond in a way that:
         1. Acknowledges what they shared 
@@ -122,6 +134,10 @@ class ConversationAgent:
         3. Helps them practice their {self.onboarding_data.target_language}
         4. Shows genuine interest in their thoughts/experiences
         5. Asks a follow-up question to continue the conversation naturally
+        6. Suggest vocabulary words only if the user explicitly asks what a 
+           word means or how to say something, or if they use the native 
+           language version of a word, which likely means they don't know the word in 
+           the target language yet.
         
         Remember their level is {self.onboarding_data.target_language_level}, so adjust your language complexity accordingly.
         """

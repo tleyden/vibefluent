@@ -38,6 +38,12 @@ def run_conversation_loop(onboarding_data):
             print("\nThinking... 🤔")
             response = conversation_agent.get_response(user_input)
 
+            if response.vocab_words_to_practice:
+                print(
+                    "\nVibeFluent: Here are some vocabulary words to practice based on your message:\n"
+                    f"{', '.join(str(word) for word in response.vocab_words_to_practice)}\n"
+                )
+
             print(f"\nVibeFluent: {response.assistant_message}")
             print(f"\nVibeFluent: {response.follow_up_question}\n")
 
