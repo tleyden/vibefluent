@@ -11,6 +11,7 @@ from onboarding import OnboardingData
 from models import ConversationResponse
 from database import get_database
 from prompt_manager import get_prompt_manager
+from drill import VocabDrillAgent
 import logfire
 from llm_agent_factory import LLMAgentFactory
 
@@ -23,6 +24,12 @@ class RealtimeAudioConversationAgent:
         self.db = get_database()
         self.prompt_manager = get_prompt_manager()
         self.factory = LLMAgentFactory()
+
+        # Mode state management
+        self.is_drill_mode = False
+        self.drill_agent = VocabDrillAgent(onboarding_data)
+        self.current_drill = None
+        self.awaiting_drill_answer = False
 
         # Create vocabulary extraction agent
         vocab_extraction_prompt = self.prompt_manager.render_vocab_extraction_prompt(
@@ -74,6 +81,65 @@ class RealtimeAudioConversationAgent:
         """Generate a personalized question for realtime audio mode."""
         return f"Hello {self.onboarding_data.name}! Welcome to realtime audio mode. I'll speak with you to help practice your {self.onboarding_data.target_language}. Start speaking, and I'll respond with audio."
 
+    def switch_to_drill_mode(self):
+        """Switch to drill mode and start a drill session."""
+        self.is_drill_mode = True
+        self.awaiting_drill_answer = False
+        self.current_drill = None
+
+        # Start drill session
+        start_message = self.drill_agent.start_drill_session()
+        logfire.info(f"Switched to drill mode for {self.onboarding_data.name}")
+
+        return start_message
+
+    def switch_to_conversation_mode(self):
+        """Switch to conversation mode."""
+        self.is_drill_mode = False
+        self.awaiting_drill_answer = False
+        self.current_drill = None
+
+        logfire.info(f"Switched to conversation mode for {self.onboarding_data.name}")
+
+        return "Welcome back to conversation mode! What would you like to chat about?"
+
+    def get_next_drill_question(self):
+        """Get the next drill question for voice interaction."""
+        self.current_drill = self.drill_agent.get_next_drill()
+
+        if self.current_drill:
+            self.awaiting_drill_answer = True
+            return self.current_drill.drill_question
+        else:
+            # No more drills
+            progress_message = self.drill_agent.get_session_progress()
+            self.awaiting_drill_answer = False
+            return f"{progress_message} Say 'next drill session' to start a new session or switch to conversation mode with 'c'."
+
+    def process_drill_answer(self, user_answer: str):
+        """Process a drill answer and provide feedback."""
+        if not self.current_drill:
+            return "No active drill. Let me get you a new question."
+
+        # Evaluate the answer
+        feedback = self.drill_agent.evaluate_answer(
+            user_answer, self.current_drill.expected_answer
+        )
+
+        # Get next drill automatically
+        next_drill = self.drill_agent.get_next_drill()
+
+        if next_drill:
+            self.current_drill = next_drill
+            self.awaiting_drill_answer = True
+            return f"{feedback} Here's your next question: {next_drill.drill_question}"
+        else:
+            # Session complete
+            self.current_drill = None
+            self.awaiting_drill_answer = False
+            progress_message = self.drill_agent.get_session_progress()
+            return f"{feedback} {progress_message} Say 'next drill session' to start a new session."
+
     def _create_system_message(self) -> str:
         """Create the system message for the OpenAI Realtime API using template."""
         vocab_words = self.db.get_all_vocab_words(self.onboarding_data)
@@ -85,9 +151,34 @@ class RealtimeAudioConversationAgent:
             ]
             vocab_context = f"\nVocabulary words to practice: {', '.join(vocab_list)}"
 
-        return self.prompt_manager.render_realtime_session_config(
+        # Add mode-specific instructions
+        mode_context = ""
+        if self.is_drill_mode:
+            mode_context = f"""
+
+DRILL MODE ACTIVE:
+You are currently in vocabulary drill mode. Your role is to:
+1. Present vocabulary drills to help {self.onboarding_data.name} practice
+2. Provide encouraging feedback on their answers
+3. Keep the session engaging and supportive
+4. Focus on their {self.onboarding_data.target_language_level} level
+
+When the user answers a drill question, evaluate their response and provide constructive feedback.
+Be encouraging and help them learn from any mistakes.
+"""
+        else:
+            mode_context = f"""
+
+CONVERSATION MODE ACTIVE:
+You are in conversation mode. Engage {self.onboarding_data.name} in natural conversation to help them practice {self.onboarding_data.target_language}.
+Ask engaging questions about their interests and help them practice speaking naturally.
+"""
+
+        base_prompt = self.prompt_manager.render_realtime_session_config(
             self.onboarding_data, vocab_context
         )
+
+        return base_prompt + mode_context
 
     async def _connect_websocket(self):
         """Connect to OpenAI Realtime API via WebSocket."""
@@ -366,8 +457,8 @@ class RealtimeAudioConversationAgent:
                 self.conversation_history.append(f"Assistant: {transcript}")
                 logfire.info(f"Assistant transcript: {transcript}")
 
-                # Process vocabulary if we have pending user transcripts
-                if self.pending_user_transcripts:
+                # Process vocabulary if we have pending user transcripts and in conversation mode
+                if self.pending_user_transcripts and not self.is_drill_mode:
                     await self._process_user_transcript(
                         self.pending_user_transcripts,
                         transcript,
@@ -412,8 +503,12 @@ class RealtimeAudioConversationAgent:
                 self.conversation_history.append(f"User: {transcript}")
                 logfire.info(f"User transcript: {transcript}")
 
-                # Add transcript to pending list for processing after assistant responds
-                self.pending_user_transcripts.append(transcript)
+                # Handle drill mode vs conversation mode
+                if self.is_drill_mode:
+                    await self._handle_drill_mode_transcript(transcript)
+                else:
+                    # Add transcript to pending list for processing after assistant responds
+                    self.pending_user_transcripts.append(transcript)
 
         elif message_type == "response.cancelled":
             # Assistant response was cancelled (due to interruption)
@@ -502,3 +597,85 @@ class RealtimeAudioConversationAgent:
         """Cleanup audio resources."""
         if hasattr(self, "audio"):
             self.audio.terminate()
+
+    async def _handle_drill_mode_transcript(self, transcript: str):
+        """Handle user transcript in drill mode."""
+        # Check for special commands
+        if transcript.lower().strip() in [
+            "next drill session",
+            "new drill session",
+            "start new session",
+        ]:
+            # Start a new drill session
+            start_message = self.drill_agent.start_drill_session()
+            next_question = self.get_next_drill_question()
+            response_text = f"{start_message} {next_question}"
+            await self._send_assistant_response(response_text)
+            return
+
+        if transcript.lower().strip() in ["skip", "next question", "next drill"]:
+            # Skip to next question
+            next_question = self.get_next_drill_question()
+            await self._send_assistant_response(next_question)
+            return
+
+        # Handle drill answer
+        if self.awaiting_drill_answer and self.current_drill:
+            # Process the user's answer
+            feedback_and_next = self.process_drill_answer(transcript)
+            await self._send_assistant_response(feedback_and_next)
+        else:
+            # No active drill, get a new one
+            next_question = self.get_next_drill_question()
+            await self._send_assistant_response(next_question)
+
+    async def _send_assistant_response(self, text: str):
+        """Send a text response as the assistant."""
+        if self.websocket and not self.websocket.closed:
+            # Create assistant message
+            message = {
+                "type": "conversation.item.create",
+                "item": {
+                    "type": "message",
+                    "role": "assistant",
+                    "content": [{"type": "input_text", "text": text}],
+                },
+            }
+            await self.websocket.send(json.dumps(message))
+
+            # Trigger audio response generation
+            response_message = {"type": "response.create"}
+            await self.websocket.send(json.dumps(response_message))
+
+    async def handle_mode_switch(self, mode: str):
+        """Handle switching between drill and conversation modes."""
+        if mode == "d" or mode == "drill":
+            if not self.is_drill_mode:
+                start_message = self.switch_to_drill_mode()
+
+                # Update session configuration for drill mode
+                await self._configure_session()
+
+                # Get first drill question
+                first_question = self.get_next_drill_question()
+                full_message = f"{start_message} {first_question}"
+
+                await self._send_assistant_response(full_message)
+
+                return f"Switched to drill mode! {full_message}"
+            else:
+                return "Already in drill mode!"
+        elif mode == "c" or mode == "conversation":
+            if self.is_drill_mode:
+                welcome_message = self.switch_to_conversation_mode()
+
+                # Update session configuration for conversation mode
+                await self._configure_session()
+
+                await self._send_assistant_response(welcome_message)
+
+                return f"Switched to conversation mode! {welcome_message}"
+            else:
+                return "Already in conversation mode!"
+
+        return f"Unknown mode: {mode}. Use 'd' for drill mode or 'c' for conversation mode."

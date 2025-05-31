@@ -209,49 +209,6 @@ def run_conversation_loop(onboarding_data):
             print(f"Let's keep going! (Currently in {mode_text} mode)\n")
 
 
-def run_realtime_audio_loop(conversation_agent, onboarding_data):
-    """Run the realtime audio conversation loop."""
-
-    async def audio_loop():
-        print(f"VibeFluent: {conversation_agent.generate_initial_question()}\n")
-
-        # Start the realtime conversation
-        success = await conversation_agent.start_conversation()
-        if not success:
-            print(
-                "Failed to start realtime audio mode. Please check your internet connection and API key."
-            )
-            return
-
-        print(
-            "🎤 Realtime audio mode active! Speak naturally - I'll respond with voice."
-        )
-        print("Commands you can type:")
-        print("- 'quit' or 'exit': End the session")
-        print("- 're-onboard': Update your profile")
-        print("- Press Enter: Start/stop recording")
-        print("=" * 60 + "\n")
-
-        # Create tasks for handling WebSocket and user input
-        input_task = asyncio.create_task(
-            handle_realtime_input(conversation_agent, onboarding_data)
-        )
-
-        try:
-            await input_task
-        except KeyboardInterrupt:
-            print(f"\n\nGoodbye, {onboarding_data.name}! Thanks for practicing! 👋")
-        finally:
-            await conversation_agent.stop_conversation()
-
-    # Run the async audio loop
-    try:
-        asyncio.run(audio_loop())
-    except Exception as e:
-        print(f"Error in realtime audio mode: {e}")
-        print("Falling back to text mode...")
-
-
 async def handle_realtime_input(conversation_agent, onboarding_data):
     """Handle user input during realtime audio mode."""
     loop = asyncio.get_event_loop()
@@ -259,9 +216,11 @@ async def handle_realtime_input(conversation_agent, onboarding_data):
     while True:
         try:
             # Get user input in a non-blocking way
-            user_input = await loop.run_in_executor(
-                None, get_user_input, "Command (or Enter to toggle recording): "
+            mode_text = "drill" if conversation_agent.is_drill_mode else "conversation"
+            prompt_text = (
+                f"Command (d=drill, c=conversation, q=quit) [{mode_text} mode]: "
             )
+            user_input = await loop.run_in_executor(None, get_user_input, prompt_text)
 
             # Check for exit commands
             if user_input.lower() in ["quit", "exit", "q"]:
@@ -269,6 +228,17 @@ async def handle_realtime_input(conversation_agent, onboarding_data):
                     f"\nGoodbye, {onboarding_data.name}! Keep practicing your {onboarding_data.target_language}! 🎉"
                 )
                 break
+
+            # Check for mode switching commands
+            if user_input.lower() in ["d", "drill", "drill mode"]:
+                result = await conversation_agent.handle_mode_switch("d")
+                print(f"\n🎯 {result}")
+                continue
+
+            if user_input.lower() in ["c", "conversation", "conversation mode"]:
+                result = await conversation_agent.handle_mode_switch("c")
+                print(f"\n💬 {result}")
+                continue
 
             # Check for re-onboard command
             if user_input == "re-onboard":
@@ -315,11 +285,59 @@ async def handle_realtime_input(conversation_agent, onboarding_data):
                     conversation_agent.is_recording = True
                 continue
 
-            # Send text commands to the conversation
+            # Send other text commands to the conversation
             await conversation_agent.send_text_message(user_input)
 
         except (EOFError, KeyboardInterrupt):
             break
+
+
+def run_realtime_audio_loop(conversation_agent, onboarding_data):
+    """Run the realtime audio conversation loop."""
+
+    async def audio_loop():
+        print(f"VibeFluent: {conversation_agent.generate_initial_question()}\n")
+
+        # Start the realtime conversation
+        success = await conversation_agent.start_conversation()
+        if not success:
+            print(
+                "Failed to start realtime audio mode. Please check your internet connection and API key."
+            )
+            return
+
+        print(
+            "🎤 Realtime audio mode active! Speak naturally - I'll respond with voice."
+        )
+        print("Commands you can type:")
+        print("- 'd' or 'drill': Switch to drill mode")
+        print("- 'c' or 'conversation': Switch to conversation mode")
+        print("- 'quit' or 'exit': End the session")
+        print("- 're-onboard': Update your profile")
+        print("- Press Enter: Start/stop recording")
+        print("=" * 60 + "\n")
+
+        # Start in conversation mode by default
+        print("💬 Starting in conversation mode. Type 'd' to switch to drill mode.\n")
+
+        # Create tasks for handling WebSocket and user input
+        input_task = asyncio.create_task(
+            handle_realtime_input(conversation_agent, onboarding_data)
+        )
+
+        try:
+            await input_task
+        except KeyboardInterrupt:
+            print(f"\n\nGoodbye, {onboarding_data.name}! Thanks for practicing! 👋")
+        finally:
+            await conversation_agent.stop_conversation()
+
+    # Run the async audio loop
+    try:
+        asyncio.run(audio_loop())
+    except Exception as e:
+        print(f"Error in realtime audio mode: {e}")
+        print("Falling back to text mode...")
 
 
 def main():
