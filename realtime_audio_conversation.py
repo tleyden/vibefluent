@@ -6,13 +6,12 @@ import pyaudio
 import threading
 import queue
 import os
-from typing import List
+from typing import List, Optional
 from onboarding import OnboardingData
 from models import ConversationResponse
 from database import get_database
 from prompt_manager import get_prompt_manager
 import logfire
-from typing import Optional
 from llm_agent_factory import LLMAgentFactory
 
 
@@ -61,6 +60,9 @@ class RealtimeAudioConversationAgent:
             raise ValueError(
                 "OPENAI_API_KEY environment variable is required for realtime audio mode"
             )
+
+        # Track pending user transcript for vocabulary processing
+        self.pending_user_transcript: Optional[str] = None
 
         logfire.info(
             f"RealtimeAudioConversationAgent initialized for {self.onboarding_data.name}",
@@ -276,20 +278,29 @@ class RealtimeAudioConversationAgent:
             except Exception as e:
                 logfire.error(f"WebSocket message handling error: {e}")
 
-    async def _process_user_transcript(self, transcript: str):
-        """Process user transcript to detect and save vocabulary words."""
-        if not transcript.strip():
+    async def _process_user_transcript(self, user_transcript: str, assistant_response: str, conversation_history: List[str]):
+        """Process user transcript with assistant response context to detect and save vocabulary words."""
+        if not user_transcript.strip():
             return
 
         try:
-            # Use LLM to detect vocabulary requests
+            # Get last 5 messages from conversation history for context
+            recent_history = conversation_history[-5:] if len(conversation_history) > 5 else conversation_history
+            history_context = "\n".join(recent_history) if recent_history else "No previous conversation"
+
+            # Use LLM to detect vocabulary requests with full context
             prompt = f"""
-            User transcript: "{transcript}"
+            Recent conversation history:
+            {history_context}
             
-            Analyze this transcript to see if the user is explicitly asking about vocabulary words.
+            User transcript: "{user_transcript}"
+            Assistant response: "{assistant_response}"
+            
+            Analyze this conversation exchange to see if the user is explicitly asking about vocabulary words.
             If they are asking how to say something, what a word means, or similar vocabulary questions,
             extract those words in both {self.onboarding_data.native_language} and {self.onboarding_data.target_language}.
             
+            Consider both the user's question and the assistant's response to understand what vocabulary was being discussed.
             Only extract words they specifically asked about, not every word they used.
             """
 
@@ -306,10 +317,11 @@ class RealtimeAudioConversationAgent:
                 )
 
                 logfire.info(
-                    f"New vocabulary words saved from audio: {', '.join(str(word) for word in vocab_response.vocab_words_user_asked_about)}",
+                    f"New vocabulary words saved from audio conversation: {', '.join(str(word) for word in vocab_response.vocab_words_user_asked_about)}",
                     onboarding_data=self.onboarding_data,
                     vocab_words=vocab_response.vocab_words_user_asked_about,
-                    transcript=transcript,
+                    user_transcript=user_transcript,
+                    assistant_response=assistant_response,
                 )
 
         except Exception as e:
@@ -335,11 +347,20 @@ class RealtimeAudioConversationAgent:
                 pass
 
         elif message_type == "response.audio_transcript.done":
-            # Complete transcript received
+            # Complete assistant transcript received
             transcript = data.get("transcript", "")
             if transcript:
                 self.conversation_history.append(f"Assistant: {transcript}")
                 logfire.info(f"Assistant transcript: {transcript}")
+                
+                # Process vocabulary if we have a pending user transcript
+                if self.pending_user_transcript:
+                    await self._process_user_transcript(
+                        self.pending_user_transcript, 
+                        transcript, 
+                        self.conversation_history
+                    )
+                    self.pending_user_transcript = None
 
         elif message_type == "response.created":
             # Response generation started
@@ -377,8 +398,8 @@ class RealtimeAudioConversationAgent:
                 self.conversation_history.append(f"User: {transcript}")
                 logfire.info(f"User transcript: {transcript}")
 
-                # Process transcript for vocabulary words
-                await self._process_user_transcript(transcript)
+                # Store transcript to process after assistant responds
+                self.pending_user_transcript = transcript
 
         elif message_type == "response.cancelled":
             # Assistant response was cancelled (due to interruption)
@@ -388,6 +409,8 @@ class RealtimeAudioConversationAgent:
             self.is_assistant_speaking = False
             # Clear any remaining audio in the queue to stop playback immediately
             self._clear_audio_queue()
+            # Clear pending transcript since response was cancelled
+            self.pending_user_transcript = None
 
         elif message_type == "error":
             error_msg = data.get("error", {}).get("message", "Unknown error")
