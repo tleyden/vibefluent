@@ -89,13 +89,20 @@ def run_conversation_loop(onboarding_data):
                             user_input, current_drill.expected_answer
                         )
                         print(f"\nVibeFluent: {feedback}")
-                        print(f"{drill_agent.get_session_progress()}")
-                        print(
-                            "Say 'next' for the next drill or 'exit drill' to return to conversation.\n"
-                        )
+                        
+                        # Automatically get next drill
+                        current_drill = drill_agent.get_next_drill()
+                        if current_drill:
+                            print(f"\nVibeFluent: {current_drill.drill_question}")
+                            print(f"Hint: {current_drill.encouragement}\n")
+                        else:
+                            print(f"\n{drill_agent.get_session_progress()}")
+                            print(
+                                "Say 'drill mode' to start a new session or 'exit drill' to return to conversation.\n"
+                            )
                     else:
                         print(
-                            "\nVibeFluent: No active drill. Say 'next' to start or 'exit drill' to return to conversation.\n"
+                            "\nVibeFluent: No active drill. Say 'drill mode' to start or 'exit drill' to return to conversation.\n"
                         )
                 continue
 
