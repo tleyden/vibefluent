@@ -153,10 +153,6 @@ class RealtimeAudioConversationAgent:
                     "model": "whisper-1",
                     "language": target_lang_code,
                 },
-                "output_audio_transcription": {
-                    "model": "whisper-1",
-                    "language": target_lang_code,
-                },
                 "turn_detection": {
                     "type": "server_vad",
                     "threshold": 0.5,
@@ -177,9 +173,7 @@ class RealtimeAudioConversationAgent:
 
         await self.websocket.send(json.dumps(config))
         logfire.info(
-            f"Session configured for realtime audio with {self.onboarding_data.target_language} transcription for both input and output",
-            target_language=self.onboarding_data.target_language,
-            target_lang_code=target_lang_code,
+            f"Session configured for realtime audio with {self.onboarding_data.target_language} transcription"
         )
 
     def _start_audio_input_stream(self):
