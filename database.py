@@ -116,6 +116,22 @@ class Database:
             .all()
         )
 
+    def get_all_vocab_words(self) -> List:
+        """Get all vocabulary words as VocabWord instances."""
+        from models import VocabWord
+
+        records = self.session.query(VocabRecord).order_by(VocabRecord.created_at.desc()).all()
+
+        vocab_words = []
+        for record in records:
+            vocab_word = VocabWord(
+                word_in_target_language=record.vocab_word_target,
+                word_in_native_language=record.vocab_word_native,
+            )
+            vocab_words.append(vocab_word)
+
+        return vocab_words
+
     def close(self):
         """Close database session."""
         self.session.close()
