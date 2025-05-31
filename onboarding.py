@@ -1,8 +1,7 @@
-import json
 import curses
 from typing import Optional
 from pydantic import BaseModel
-from pathlib import Path
+from database import get_database
 
 
 class OnboardingData(BaseModel):
@@ -113,22 +112,15 @@ class OnboardingUI:
 
 
 def load_onboarding_data() -> Optional[OnboardingData]:
-    """Load onboarding data from onboard.json if it exists."""
-    onboard_file = Path("onboard.json")
-    if onboard_file.exists():
-        try:
-            with open(onboard_file, "r") as f:
-                data = json.load(f)
-            return OnboardingData(**data)
-        except (json.JSONDecodeError, ValueError):
-            return None
-    return None
+    """Load onboarding data from SQLite database."""
+    db = get_database()
+    return db.load_onboarding_data()
 
 
 def save_onboarding_data(data: OnboardingData) -> None:
-    """Save onboarding data to onboard.json."""
-    with open("onboard.json", "w") as f:
-        json.dump(data.model_dump(), f, indent=2)
+    """Save onboarding data to SQLite database."""
+    db = get_database()
+    db.save_onboarding_data(data)
 
 
 def run_onboarding() -> OnboardingData:
