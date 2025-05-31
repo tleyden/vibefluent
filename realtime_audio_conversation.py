@@ -26,7 +26,9 @@ class RealtimeAudioConversationAgent:
         self.factory = LLMAgentFactory()
 
         # Create vocabulary extraction agent
-        vocab_extraction_prompt = self._create_vocab_extraction_prompt()
+        vocab_extraction_prompt = self.prompt_manager.render_vocab_extraction_prompt(
+            self.onboarding_data
+        )
         self.vocab_extractor = self.factory.create_agent(
             result_type=ConversationResponse,
             system_prompt=vocab_extraction_prompt,
@@ -67,7 +69,7 @@ class RealtimeAudioConversationAgent:
 
     def generate_initial_question(self) -> str:
         """Generate a personalized question for realtime audio mode."""
-        return f"Hello {self.onboarding_data.name}! Welcome to realtime audio mode. I'll speak with you to help practice your {self.onboarding_data.target_language}. Press Enter to start recording, and I'll respond with audio."
+        return f"Hello {self.onboarding_data.name}! Welcome to realtime audio mode. I'll speak with you to help practice your {self.onboarding_data.target_language}. Start speaking, and I'll respond with audio."
 
     def _create_system_message(self) -> str:
         """Create the system message for the OpenAI Realtime API using template."""
@@ -243,30 +245,6 @@ class RealtimeAudioConversationAgent:
                 break
             except Exception as e:
                 logfire.error(f"WebSocket message handling error: {e}")
-
-    def _create_vocab_extraction_prompt(self) -> str:
-        """Create system prompt for vocabulary extraction agent."""
-        return f"""
-        You are helping {self.onboarding_data.name} learn {self.onboarding_data.target_language}.
-        
-        Your task is to analyze user speech transcripts and detect when they explicitly ask about vocabulary words.
-        
-        Look for patterns like:
-        - "How do you say [word] in {self.onboarding_data.target_language}?"
-        - "What does [word] mean?"
-        - "What's the {self.onboarding_data.target_language} word for [word]?"
-        - "How do you pronounce [word]?"
-        
-        Extract vocabulary words they're asking about and provide them in both languages.
-        
-        Response format:
-        - assistant_message: Brief acknowledgment (not used in audio mode)
-        - follow_up_question: Brief follow-up (not used in audio mode)  
-        - vocab_words_user_asked_about: List of vocabulary words they asked about
-        
-        Only extract words they explicitly asked about - don't extract every word they used.
-        Each word should be a single word, not a phrase. Focus on content words (nouns, verbs, adjectives).
-        """
 
     async def _process_user_transcript(self, transcript: str):
         """Process user transcript to detect and save vocabulary words."""

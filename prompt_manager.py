@@ -43,6 +43,12 @@ class PromptManager:
         context = self._get_base_context(onboarding_data)
         return template.render(**context)
 
+    def render_vocab_extraction_prompt(self, onboarding_data: OnboardingData) -> str:
+        """Render the vocabulary extraction prompt template."""
+        template = self.env.get_template("vocab_extraction_prompt.j2")
+        context = self._get_base_context(onboarding_data)
+        return template.render(**context)
+
     def render_realtime_session_config(
         self, onboarding_data: OnboardingData, vocab_context: str = ""
     ) -> str:
