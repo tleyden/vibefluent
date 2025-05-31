@@ -89,7 +89,7 @@ def run_conversation_loop(onboarding_data):
                             user_input, current_drill.expected_answer
                         )
                         print(f"\nVibeFluent: {feedback}")
-                        
+
                         # Automatically get next drill
                         current_drill = drill_agent.get_next_drill()
                         if current_drill:
