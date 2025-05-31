@@ -240,10 +240,10 @@ This is a voice conversation, so speak naturally as you would in person. Be enco
                 logfire.info(f"Assistant transcript: {transcript}")
 
         elif message_type == "input_audio_buffer.speech_started":
-            logfire.info("User started speaking")
+            logfire.trace("User started speaking")
 
         elif message_type == "input_audio_buffer.speech_stopped":
-            logfire.info("User stopped speaking")
+            logfire.trace("User stopped speaking")
 
         elif message_type == "conversation.item.input_audio_transcription.completed":
             # User's speech was transcribed
