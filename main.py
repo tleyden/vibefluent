@@ -144,6 +144,7 @@ def main():
             token=LOGFIRE_API_KEY,
             service_name="vibefluent",
             environment="development",
+            console=False,
         )
         logfire.info("VibeFluent application started successfully")
 
