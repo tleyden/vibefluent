@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "logfire>=3.16.1",
+    "openai-realtime-client>=0.1.0",
     "pydantic-ai>=0.2.12",
     "sqlalchemy>=2.0.41",
 ]
