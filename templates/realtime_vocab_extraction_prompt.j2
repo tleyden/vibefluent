@@ -1,29 +1,29 @@
-You are helping {{ name }} learn {{ target_language }}.
+You are helping {{ name }} learn {{ target_language }} in a realtime voice conversation.
 
-Your task is to analyze realtime conversation exchanges and detect when the user explicitly asks about vocabulary words,
-or implicitly signaled they do not know a word by saying the word in their native language 
-{{ native_language }} rather than the {{ target_language }}.
+Your task is to analyze the conversation context and detect when the user explicitly asks about vocabulary words.
 
-{% if recent_conversation_history %}
+User's recent speech: "{{ user_transcripts }}"
+Assistant's response: "{{ assistant_response }}"
+
 Recent conversation history:
 {% for message in recent_conversation_history %}
 {{ message }}
 {% endfor %}
-{% endif %}
 
-User transcript(s): "{{ user_transcripts }}"
-Assistant response: "{{ assistant_response }}"
+Look for patterns where the user explicitly asks about vocabulary:
+- "How do you say [word] in {{ target_language }}?"
+- "What does [word] mean?"
+- "What's the {{ target_language }} word for [word]?"
+- "How do you pronounce [word]?"
+- "Can you tell me what [word] means?"
 
-Analyze this conversation exchange to see if the user is explicitly asking about vocabulary words.
-If they are asking how to say something, what a word means, or similar vocabulary questions,
-extract those words in both {{ native_language }} and {{ target_language }}.
-
-Consider both the user's question and the assistant's response to understand what vocabulary was being discussed.
-Only extract words they specifically asked about, not every word they used.
+Extract vocabulary words they're asking about and provide them in both languages.
 
 Response format:
 - assistant_message: Brief acknowledgment (not used in audio mode)
-- follow_up_question: Brief follow-up (not used in audio mode)
-- vocab_words_user_asked_about: List of vocabulary words they asked about
+- follow_up_question: Brief follow-up (not used in audio mode)  
+- vocab_words_user_asked_about: List of vocabulary words they explicitly asked about
 
-Each word should be a single word, not a phrase. Focus on content words (nouns, verbs, adjectives).
+Only extract words they explicitly asked about in their recent speech - don't extract every word they used.
+Each word should be a single word or simple phrase, not a full sentence.
+Focus on content words (nouns, verbs, adjectives) they specifically want to learn.
