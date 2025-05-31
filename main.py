@@ -1,7 +1,9 @@
 from onboarding import load_onboarding_data, run_onboarding
 from conversation import ConversationAgent
+from realtime_audio_conversation import RealtimeAudioConversationAgent
 from drill import VocabDrillAgent
 from database import get_database
+from constants import MODE
 from dotenv import load_dotenv
 import logfire
 import os
@@ -34,14 +36,19 @@ def run_conversation_loop(onboarding_data):
     """Run the main conversation loop with drill mode support."""
     print("\n" + "=" * 60)
     print("🌍 Welcome to your conversation practice! 🌍")
+    print(f"Mode: {MODE}")
     print("Type 'quit' or 'exit' to end the conversation")
     print("Type 'drill mode' to enter vocabulary drill mode")
     print("Type 're-onboard' to update your profile settings")
     print("Press Ctrl+C to exit anytime")
     print("=" * 60 + "\n")
 
-    # Initialize agents and database
-    conversation_agent = ConversationAgent(onboarding_data)
+    # Initialize agents and database based on mode
+    if MODE == "REALTIME_AUDIO":
+        conversation_agent = RealtimeAudioConversationAgent(onboarding_data)
+    else:  # Default to TEXT mode
+        conversation_agent = ConversationAgent(onboarding_data)
+
     drill_agent = VocabDrillAgent(onboarding_data)
     db = get_database()
 
@@ -84,7 +91,10 @@ def run_conversation_loop(onboarding_data):
                 )
 
                 # Reinitialize agents with new data
-                conversation_agent = ConversationAgent(new_onboarding_data)
+                if MODE == "REALTIME_AUDIO":
+                    conversation_agent = RealtimeAudioConversationAgent(new_onboarding_data)
+                else:  # Default to TEXT mode
+                    conversation_agent = ConversationAgent(new_onboarding_data)
                 drill_agent = VocabDrillAgent(new_onboarding_data)
                 onboarding_data = new_onboarding_data
 
