@@ -28,6 +28,9 @@ class RealtimeAudioConversationAgent:
         vocab_extraction_prompt = self.prompt_manager.render_vocab_extraction_prompt(
             self.onboarding_data
         )
+        self.vocab_extraction_system_prompt = (
+            vocab_extraction_prompt  # Save for logging
+        )
         self.vocab_extractor = self.factory.create_agent(
             result_type=ConversationResponse,
             system_prompt=vocab_extraction_prompt,
@@ -309,6 +312,16 @@ class RealtimeAudioConversationAgent:
 
             # Use async version instead of sync
             result = await self.vocab_extractor.run(prompt)
+
+            # Log the agent call result
+            logfire.info(
+                f"Vocab extractor agent result for {self.onboarding_data.name}",
+                result=result.data,
+                prompt=prompt,
+                system_prompt=self.vocab_extraction_system_prompt,
+                onboarding_data=self.onboarding_data,
+            )
+
             vocab_response = result.data
 
             # Save any vocabulary words that were detected
