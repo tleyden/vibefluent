@@ -67,7 +67,7 @@ class RealtimeAudioConversationAgent:
 
     def generate_initial_question(self) -> str:
         """Generate a personalized question for realtime audio mode."""
-        return f"Hello {self.onboarding_data.name}! Welcome to realtime audio mode. I'll speak with you to help practice your {self.onboarding_data.target_language}. Press Enter to start recording, and I'll respond with audio. Say 'exit realtime' to return to text mode."
+        return f"Hello {self.onboarding_data.name}! Welcome to realtime audio mode. I'll speak with you to help practice your {self.onboarding_data.target_language}. Press Enter to start recording, and I'll respond with audio."
 
     def _create_system_message(self) -> str:
         """Create the system message for the OpenAI Realtime API using template."""
@@ -122,7 +122,7 @@ class RealtimeAudioConversationAgent:
                     "type": "server_vad",
                     "threshold": 0.5,
                     "prefix_padding_ms": 300,
-                    "silence_duration_ms": 200,
+                    "silence_duration_ms": 400,
                 },
                 "tools": [],
                 "tool_choice": "auto",
@@ -285,7 +285,8 @@ class RealtimeAudioConversationAgent:
             Only extract words they specifically asked about, not every word they used.
             """
 
-            result = self.vocab_extractor.run_sync(prompt)
+            # Use async version instead of sync
+            result = await self.vocab_extractor.run(prompt)
             vocab_response = result.data
 
             # Save any vocabulary words that were detected
