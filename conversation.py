@@ -58,6 +58,11 @@ class ConversationAgent:
                                    Each word should be a word, not a phrase or sentence. 
                                    If its a phrase, either ignore it or capture the most salient word.
                                    If its unclear, just capture the first word that is not a preposition or article.
+                                   Likewise, did the user use the wrong language for a word in their message?
+                                   For example, maybe they used a Spanish word in a Portuguese sentence, or an
+                                   English word in a German sentence.  If so, extract that word in the 
+                                   native ({self.onboarding_data.native_language}) and
+                                   target language ({self.onboarding_data.target_language}) as well.
 
         Keep responses conversational, warm, and appropriately challenging for their level.
         """
