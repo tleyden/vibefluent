@@ -28,7 +28,7 @@ class VocabDrillAgent:
             result_type=DrillResponse,
             system_prompt=self._generate_system_prompt(),
         )
-        
+
         # Create evaluation agent
         self.evaluator = self.factory.create_agent(
             result_type=AnswerEvaluation,
@@ -51,7 +51,10 @@ class VocabDrillAgent:
         3. Adapt difficulty to their {self.onboarding_data.target_language_level} level
         4. Be encouraging and supportive
         5. Keep instructions clear and concise
-        6. Don't give away the answers directly as part of the question
+        6. Test the user's memory recall abilities, so avoid using both the native language word 
+           and target language translation in the same drill, since it doesn't test their recall.
+           For example, don't ask |How would you say "The scientist is in the field of quantum physics" in Spanish, using the word "ámbito"?|
+           Because it contains both "field" and "ámbito" in the same question.
         
         Drill formats to use:
         - Translation drills: "How do you say [native word] in {self.onboarding_data.target_language}?"
@@ -65,7 +68,7 @@ class VocabDrillAgent:
         
         Keep everything concise and voice-interaction friendly.
         """
-    
+
     def _generate_evaluation_prompt(self) -> str:
         return f"""
         You are evaluating {self.onboarding_data.name}'s answers to vocabulary drills for learning {self.onboarding_data.target_language}.
@@ -157,21 +160,21 @@ class VocabDrillAgent:
         
         Be encouraging and supportive in your feedback.
         """
-        
+
         try:
             result = self.evaluator.run_sync(prompt)
             evaluation = result.data
-            
+
             if evaluation.is_correct:
                 return f"Excellent! {evaluation.feedback} 🎉"
             else:
                 return f"{evaluation.feedback} Let's keep practicing!"
-                
+
         except Exception:
             # Fallback to simple comparison if LLM fails
             user_clean = user_answer.strip().lower()
             expected_clean = expected.strip().lower()
-            
+
             if (
                 user_clean == expected_clean
                 or user_clean in expected_clean
