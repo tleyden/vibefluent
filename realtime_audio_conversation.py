@@ -111,6 +111,31 @@ class RealtimeAudioConversationAgent:
 
     async def _configure_session(self):
         """Configure the OpenAI Realtime session."""
+        # Map common language names to ISO codes for Whisper
+        language_mapping = {
+            "Spanish": "es",
+            "French": "fr",
+            "German": "de",
+            "Italian": "it",
+            "Portuguese": "pt",
+            "Russian": "ru",
+            "Japanese": "ja",
+            "Korean": "ko",
+            "Chinese": "zh",
+            "Mandarin": "zh",
+            "Dutch": "nl",
+            "Polish": "pl",
+            "Turkish": "tr",
+            "Arabic": "ar",
+            "Hindi": "hi",
+            "English": "en",
+        }
+
+        # Get the ISO language code for the target language
+        target_lang_code = language_mapping.get(
+            self.onboarding_data.target_language, "en"
+        )
+
         config = {
             "type": "session.update",
             "session": {
@@ -119,7 +144,10 @@ class RealtimeAudioConversationAgent:
                 "voice": "alloy",
                 "input_audio_format": "pcm16",
                 "output_audio_format": "pcm16",
-                "input_audio_transcription": {"model": "whisper-1"},
+                "input_audio_transcription": {
+                    "model": "whisper-1",
+                    "language": target_lang_code,
+                },
                 "turn_detection": {
                     "type": "server_vad",
                     "threshold": 0.5,
@@ -139,7 +167,9 @@ class RealtimeAudioConversationAgent:
             )
 
         await self.websocket.send(json.dumps(config))
-        logfire.info("Session configured for realtime audio")
+        logfire.info(
+            f"Session configured for realtime audio with {self.onboarding_data.target_language} transcription"
+        )
 
     def _start_audio_input_stream(self):
         """Start recording audio from microphone."""
