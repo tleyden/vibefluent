@@ -86,14 +86,14 @@ class RealtimeAudioConversationAgent:
         """Create the system message for the OpenAI Realtime API using template."""
         vocab_words = self.db.get_all_vocab_words(self.onboarding_data)
         vocab_context = ""
-        
+
         if vocab_words:
             vocab_list = [
                 f"{w.word_in_target_language} ({w.word_in_native_language})"
                 for w in vocab_words[:20]
             ]
             vocab_context = f"\nVocabulary words to practice: {', '.join(vocab_list)}"
-            
+
             # Add vocabulary drills to the context if drills are enabled
             if DO_VOCAB_DRILLS and vocab_words:
                 drill_instructions = self._generate_drill_instructions(vocab_words)
@@ -116,12 +116,12 @@ class RealtimeAudioConversationAgent:
 
         # Create drill instructions
         drill_text = f"VOCABULARY DRILL INSTRUCTIONS:\nWhen the conversation starts, immediately present these {len(all_drills)} vocabulary drill questions to help the user practice. Present them naturally in your first response:\n\n"
-        
+
         for i, drill in enumerate(all_drills):
             drill_text += f"Question {i + 1}: {drill['question']}\n"
-        
+
         drill_text += f"\nAfter presenting all {len(all_drills)} questions, tell the user they can answer them at their own pace and that you'll continue with natural conversation afterward."
-        
+
         return drill_text
 
     async def _connect_websocket(self):
@@ -221,36 +221,36 @@ class RealtimeAudioConversationAgent:
 
     # Remove the immediate drill sending method since drills are now in system prompt
     # async def _start_initial_vocab_drills_immediately(self):
-        # """Start vocabulary drills immediately after session configuration."""
-        # # Get all existing vocabulary words
-        # existing_vocab_words = self.db.get_all_vocab_words(self.onboarding_data)
+    # """Start vocabulary drills immediately after session configuration."""
+    # # Get all existing vocabulary words
+    # existing_vocab_words = self.db.get_all_vocab_words(self.onboarding_data)
 
-        # if not existing_vocab_words:
-        #     logfire.info(
-        #         f"No existing vocabulary words found for {self.onboarding_data.name}"
-        #     )
-        #     return
+    # if not existing_vocab_words:
+    #     logfire.info(
+    #         f"No existing vocabulary words found for {self.onboarding_data.name}"
+    #     )
+    #     return
 
-        # logfire.info(
-        #     f"Starting initial vocabulary drills immediately for {self.onboarding_data.name} with {len(existing_vocab_words)} words",
-        #     vocab_words=[str(word) for word in existing_vocab_words],
-        # )
+    # logfire.info(
+    #     f"Starting initial vocabulary drills immediately for {self.onboarding_data.name} with {len(existing_vocab_words)} words",
+    #     vocab_words=[str(word) for word in existing_vocab_words],
+    # )
 
-        # # Generate all drills upfront
-        # all_drills = []
-        # for vocab_word in existing_vocab_words:
-        #     drill = self._generate_vocab_drill(vocab_word)
-        #     all_drills.append(drill)
+    # # Generate all drills upfront
+    # all_drills = []
+    # for vocab_word in existing_vocab_words:
+    #     drill = self._generate_vocab_drill(vocab_word)
+    #     all_drills.append(drill)
 
-        # # Shuffle for variety
-        # random.shuffle(all_drills)
+    # # Shuffle for variety
+    # random.shuffle(all_drills)
 
-        # # Send all drills as conversation items at once - no waiting needed since no responses are active yet
-        # await self._send_all_drills_upfront(all_drills, is_initial=True)
+    # # Send all drills as conversation items at once - no waiting needed since no responses are active yet
+    # await self._send_all_drills_upfront(all_drills, is_initial=True)
 
-        # # Mark as started
-        # self.is_in_drill_mode = True
-        # self.initial_drills_started = True
+    # # Mark as started
+    # self.is_in_drill_mode = True
+    # self.initial_drills_started = True
 
     def _start_audio_input_stream(self):
         """Start recording audio from microphone."""
