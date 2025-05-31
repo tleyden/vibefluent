@@ -36,7 +36,7 @@ class ConversationAgent:
         - Current Level: {self.onboarding_data.target_language_level}
         - Interests: {self.onboarding_data.conversation_interests}
         - Learning Goal: {self.onboarding_data.reason_for_learning}
-        - Vocabulary Words To Practice: {self.db.get_all_vocab_words()}
+        - Vocabulary Words To Practice: {self.db.get_all_vocab_words(self.onboarding_data)}
         
         Your role:
         1. Make the conversation feel natural and enjoyable

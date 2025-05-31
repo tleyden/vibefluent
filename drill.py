@@ -7,6 +7,7 @@ import random
 from pydantic import BaseModel
 import logfire
 
+
 class DrillResponse(BaseModel):
     drill_question: str
     expected_answer: str
@@ -101,7 +102,7 @@ class VocabDrillAgent:
 
     def start_drill_session(self) -> str:
         """Start a new drill session with available vocabulary."""
-        self.current_vocab_words = self.db.get_all_vocab_words()
+        self.current_vocab_words = self.db.get_all_vocab_words(self.onboarding_data)
 
         if not self.current_vocab_words:
             return "You don't have any vocabulary words to practice yet! Try having a conversation first and ask about some words."
@@ -170,7 +171,6 @@ class VocabDrillAgent:
             return f"Excellent! {evaluation.feedback} 🎉"
         else:
             return f"{evaluation.feedback} Let's keep practicing!"
-
 
     def get_session_progress(self) -> str:
         """Get current progress in the drill session."""

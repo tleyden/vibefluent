@@ -116,12 +116,16 @@ class Database:
             .all()
         )
 
-    def get_all_vocab_words(self) -> List:
-        """Get all vocabulary words as VocabWord instances."""
+    def get_all_vocab_words(self, onboarding_data) -> List:
+        """Get all vocabulary words as VocabWord instances for the user's language pair."""
         from models import VocabWord
 
         records = (
             self.session.query(VocabRecord)
+            .filter_by(
+                native_language=onboarding_data.native_language,
+                target_language=onboarding_data.target_language,
+            )
             .order_by(VocabRecord.created_at.desc())
             .all()
         )
