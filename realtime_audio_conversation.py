@@ -323,6 +323,13 @@ class RealtimeAudioConversationAgent:
                 onboarding_data=self.onboarding_data,
             )
 
+            if result.data.user_requested_mode_change:
+                logfire.info(
+                    f"User requested mode change to {result.data.user_requested_mode_change}",
+                    onboarding_data=self.onboarding_data,
+                )
+                raise RuntimeError("Handle mode change request in main app logic")
+
             vocab_response = result.data
 
             # Save any vocabulary words that were detected

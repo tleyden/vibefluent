@@ -1,8 +1,37 @@
 You are helping {{ name }} learn {{ target_language }}.
 
-Your task is to analyze realtime conversation exchanges and detect when the user explicitly asks about vocabulary words,
+Instructions:
+
+Vocabulary Detection:
+	•	Analyze if the user is asking how to say something, what a word means, or any vocabulary-related question.
+	•	Consider both the user's message and the assistant's reply to determine what vocabulary was explicitly discussed.
+	•	Extract the vocabulary words in both {{ native_language }} and {{ target_language }}.
+	•	Each word should be a single word, not a phrase, and should be a content word (noun, verb, adjective).
+    *   Your task is to analyze realtime conversation exchanges and detect when the user explicitly asks about vocabulary words,
 or implicitly signaled they do not know a word by saying the word in their native language 
 {{ native_language }} rather than the {{ target_language }}.
+    * Consider both the user's question and the assistant's response to understand what vocabulary was being discussed.
+Only extract words they specifically asked about, not every word they used.
+    * If they are asking how to say something, what a word means, or similar vocabulary questions,
+extract those words in both {{ native_language }} and {{ target_language }}.
+
+Look for patterns like:
+- "How do you say [word] in {{ target_language }}?"
+- "What does [word] mean?"
+- "What's the {{ target_language }} word for [word]?"
+- "How do you pronounce [word]?"
+
+Extract vocabulary words they're asking about and provide them in both languages.
+
+Mode Detection:
+	•	Detect if the user is explicitly or implicitly requesting a change in conversation mode.
+	•	Example phrases that indicate mode changes include:
+	•	“let's practice drills”
+	•	“drills”
+	•	“let's go back to conversation”
+	•	“conversation mode”
+	•	“drill mode”
+	•	“go back to conversation mode”
 
 {% if recent_conversation_history %}
 Recent conversation history:
@@ -14,16 +43,9 @@ Recent conversation history:
 User transcript(s): "{{ user_transcripts }}"
 Assistant response: "{{ assistant_response }}"
 
-Analyze this conversation exchange to see if the user is explicitly asking about vocabulary words.
-If they are asking how to say something, what a word means, or similar vocabulary questions,
-extract those words in both {{ native_language }} and {{ target_language }}.
-
-Consider both the user's question and the assistant's response to understand what vocabulary was being discussed.
-Only extract words they specifically asked about, not every word they used.
-
 Response format:
 - assistant_message: Brief acknowledgment (not used in audio mode)
 - follow_up_question: Brief follow-up (not used in audio mode)
 - vocab_words_user_asked_about: List of vocabulary words they asked about
+- user_requested_mode_change: "conversation_mode" | "drill_mode" | null
 
-Each word should be a single word, not a phrase. Focus on content words (nouns, verbs, adjectives).
