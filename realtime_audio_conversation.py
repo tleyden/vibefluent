@@ -155,26 +155,16 @@ class RealtimeAudioConversationAgent:
                 "tools": [
                     {
                         "type": "function",
-                        "name": "get_current_time",
-                        "description": "Get the current time when the user asks for it",
-                        "parameters": {
-                            "type": "object",
-                            "properties": {},
-                            "required": [],
-                        },
-                    },
-                    {
-                        "type": "function",
                         "name": "user_used_native_language_mistake",
                         "description": f"""
-                        If the user uses the native language {self.onboarding_data.native_language} instead of the target language {self.onboarding_data.target_language}, consider it a mistake.
+                        If the user uses the native language {self.onboarding_data.native_language}, or any other language, instead of the target language {self.onboarding_data.target_language}, consider it a mistake.
                         """,
                         "parameters": {
                             "type": "object",
                             "properties": {
                                 "mistake_explanation": {
                                     "type": "string",
-                                    "description": "Breif explanation of the mistake",
+                                    "description": "Brief explanation of the mistake, including the words or phrases that were supposed to be in the target language but were in another language.",
                                 },
                             },
                             "required": [
@@ -605,37 +595,6 @@ class RealtimeAudioConversationAgent:
                     await self._extract_vocabulary_from_mistake(arguments)
 
                 asyncio.create_task(delayed_extract())
-
-            elif function_name == "get_current_time":
-                logfire.info(
-                    "Received get_current_time function call - processing",
-                    data=data,
-                )
-
-                from datetime import datetime
-
-                current_time = datetime.now().strftime("%I:%M %p")
-
-                # Send function call result back to the API
-                result_message = {
-                    "type": "conversation.item.create",
-                    "item": {
-                        "type": "function_call_output",
-                        "call_id": data.get("call_id"),
-                        "output": json.dumps({"current_time": current_time}),
-                    },
-                }
-
-                if not self.websocket or self.websocket.closed:
-                    raise RuntimeError(
-                        "WebSocket connection is not open. Cannot send function call result."
-                    )
-
-                await self.websocket.send(json.dumps(result_message))
-
-                # Trigger response generation after function call
-                response_message = {"type": "response.create"}
-                await self.websocket.send(json.dumps(response_message))
 
         except Exception as e:
             logfire.exception(f"Error processing function call: {e}")
