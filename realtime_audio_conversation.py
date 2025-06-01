@@ -68,7 +68,7 @@ class RealtimeAudioConversationAgent:
 
     def _create_system_message(self) -> str:
         """Create the system message for the OpenAI Realtime API using template."""
-        vocab_words = self.db.get_all_vocab_words(self.onboarding_data)
+        vocab_words = self.db.get_all_vocab_words(self.onboarding_data, limit=20)
         vocab_context = ""
         if vocab_words:
             vocab_list = [
@@ -105,24 +105,24 @@ class RealtimeAudioConversationAgent:
     async def _configure_session(self):
         """Configure the OpenAI Realtime session."""
         # Map common language names to ISO codes for Whisper
-        language_mapping = {
-            "Spanish": "es",
-            "French": "fr",
-            "German": "de",
-            "Italian": "it",
-            "Portuguese": "pt",
-            "Russian": "ru",
-            "Japanese": "ja",
-            "Korean": "ko",
-            "Chinese": "zh",
-            "Mandarin": "zh",
-            "Dutch": "nl",
-            "Polish": "pl",
-            "Turkish": "tr",
-            "Arabic": "ar",
-            "Hindi": "hi",
-            "English": "en",
-        }
+        # language_mapping = {
+        #     "Spanish": "es",
+        #     "French": "fr",
+        #     "German": "de",
+        #     "Italian": "it",
+        #     "Portuguese": "pt",
+        #     "Russian": "ru",
+        #     "Japanese": "ja",
+        #     "Korean": "ko",
+        #     "Chinese": "zh",
+        #     "Mandarin": "zh",
+        #     "Dutch": "nl",
+        #     "Polish": "pl",
+        #     "Turkish": "tr",
+        #     "Arabic": "ar",
+        #     "Hindi": "hi",
+        #     "English": "en",
+        # }
 
         # Get the ISO language code for the target language
         # target_lang_code = language_mapping.get(
@@ -671,7 +671,7 @@ class RealtimeAudioConversationAgent:
 
     async def _process_user_wants_vocab_drill(self, data):
 
-        vocab_words = self.db.get_all_vocab_words(self.onboarding_data)
+        vocab_words = self.db.get_all_vocab_words(self.onboarding_data, limit=20)
 
         message = f"""
         The user wants to do vocabulary drills.  Run the user through a vocabulary drill session with the following words:

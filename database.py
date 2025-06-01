@@ -125,7 +125,7 @@ class Database:
         self.session.commit()
 
 
-    def get_all_vocab_words(self, onboarding_data) -> List:
+    def get_all_vocab_words(self, onboarding_data, limit: int = 20) -> List:
         """Get all vocabulary words as VocabWord instances for the user's language pair."""
         from models import VocabWord
 
@@ -136,6 +136,7 @@ class Database:
                 target_language=onboarding_data.target_language,
             )
             .order_by(VocabRecord.created_at.desc())
+            .limit(limit)
             .all()
         )
 
