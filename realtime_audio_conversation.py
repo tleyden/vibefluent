@@ -13,7 +13,7 @@ from database import get_database
 from prompt_manager import get_prompt_manager
 import logfire
 from llm_agent_factory import LLMAgentFactory
-
+from constants import DEFAULT_REALTIME_AUDIO_MODEL
 
 class RealtimeAudioConversationAgent:
     def __init__(self, onboarding_data: OnboardingData):
@@ -91,12 +91,7 @@ class RealtimeAudioConversationAgent:
 
     async def _connect_websocket(self):
         """Connect to OpenAI Realtime API via WebSocket."""
-        
-        # url = (
-        #     "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01"
-        # )
-
-        url = "wss://api.openai.com/v1/realtime?model=gpt-4o-mini-realtime-preview-2024-12-17"
+        url = f"wss://api.openai.com/v1/realtime?model={DEFAULT_REALTIME_AUDIO_MODEL}"
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "OpenAI-Beta": "realtime=v1",
