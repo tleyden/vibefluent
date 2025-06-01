@@ -155,6 +155,16 @@ class RealtimeAudioConversationAgent:
                 "tools": [
                     {
                         "type": "function",
+                        "name": "get_current_time",
+                        "description": "Get the current time when the user asks for it",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {},
+                            "required": [],
+                        },
+                    },
+                    {
+                        "type": "function",
                         "name": "record_mistake",
                         "description": "Record a language mistake made by the user during conversation",
                         "parameters": {
@@ -191,7 +201,7 @@ class RealtimeAudioConversationAgent:
                                 "explanation",
                             ],
                         },
-                    }
+                    },
                 ],
                 "tool_choice": "auto",
                 "temperature": 0.8,
@@ -524,45 +534,71 @@ class RealtimeAudioConversationAgent:
                 "Received function call arguments (final output) - processing function call",
                 data=data,
             )
+            await self.process_function_call(data)
+
+    async def process_function_call(self, data):
+        try:
+            logfire.info("processing function call", data=data)
             # Function call arguments complete - handle tool calls
-            item = data.get("item", {})
-            if item.get("type") == "function_call":
-                function_name = item.get("name")
-                if function_name == "record_mistake":
-                    try:
-                        arguments = json.loads(item.get("arguments", "{}"))
-                        await self._record_mistake(arguments)
+            function_name = data.get("name", "")
+            logfire.info(f"function name: {function_name}")
 
-                        # Send function call result back to the API
-                        result_message = {
-                            "type": "conversation.item.create",
-                            "item": {
-                                "type": "function_call_output",
-                                "call_id": item.get("call_id"),
-                                "output": json.dumps(
-                                    {
-                                        "success": True,
-                                        "message": "Mistake recorded successfully",
-                                    }
-                                ),
-                            },
-                        }
+            if function_name == "record_mistake":
+                arguments = json.loads(data.get("arguments", "{}"))
+                await self._record_mistake(arguments)
 
-                        if not self.websocket or self.websocket.closed:
-                            raise RuntimeError(
-                                "WebSocket connection is not open. Cannot send function call result."
-                            )
+                # Send function call result back to the API
+                result_message = {
+                    "type": "conversation.item.create",
+                    "item": {
+                        "type": "function_call_output",
+                        "call_id": data.get("call_id"),
+                        "output": json.dumps(
+                            {
+                                "success": True,
+                                "message": "Mistake recorded successfully",
+                            }
+                        ),
+                    },
+                }
 
-                        await self.websocket.send(json.dumps(result_message))
+                if not self.websocket or self.websocket.closed:
+                    raise RuntimeError(
+                        "WebSocket connection is not open. Cannot send function call result."
+                    )
 
-                        # # Trigger response generation to continue conversation
-                        # response_message = {"type": "response.create"}
-                        # await self.websocket.send(json.dumps(response_message))
+                await self.websocket.send(json.dumps(result_message))
 
-                    except Exception as e:
-                        logfire.error(
-                            f"Error processing record_mistake function call: {e}.  Mistake likely not recorded."
-                        )
+            elif function_name == "get_current_time":
+                logfire.info(
+                    "Received get_current_time function call - processing",
+                    data=data,
+                )
+
+                from datetime import datetime
+
+                current_time = datetime.now().strftime("%I:%M %p")
+
+                # Send function call result back to the API
+                result_message = {
+                    "type": "conversation.item.create",
+                    "item": {
+                        "type": "function_call_output",
+                        "call_id": data.get("call_id"),
+                        "output": json.dumps({"current_time": current_time}),
+                    },
+                }
+
+                if not self.websocket or self.websocket.closed:
+                    raise RuntimeError(
+                        "WebSocket connection is not open. Cannot send function call result."
+                    )
+
+                await self.websocket.send(json.dumps(result_message))
+
+        except Exception as e:
+            logfire.exception(f"Error processing function call: {e}")
+            return
 
     async def start_conversation(self):
         """Start the realtime audio conversation."""
