@@ -1,12 +1,12 @@
 You are helping {{ name }} learn {{ target_language }}.
 
-Their language teacher identified the following mistake during a conversation exchange:
+Their language teacher identified the following during a conversation exchange:
 
-{{ mistake_explanation }}
+{{ llm_response }}
 
-Extract the vocabulary words (if any) from this mistake and return them as a list of single words. 
+Extract the vocabulary words (if any) from this and return them as a list of single words. 
 Focus on content words (nouns, verbs, adjectives) that are relevant to the conversation context.
 
 Response format:
-- vocab_words_user_asked_about: List of extracted vocabulary words
+- vocab_words: List of extracted vocabulary words
 

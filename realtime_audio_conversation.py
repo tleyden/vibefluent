@@ -389,13 +389,11 @@ class RealtimeAudioConversationAgent:
     #     except Exception as e:
     #         logfire.error(f"Error processing user transcript for vocab: {e}")
 
-    async def _extract_vocabulary_from_mistake(self, mistake_data: dict):
+    async def _extract_vocabulary_from_llm_response(self, llm_response: str):
         try:
-            mistake_explanation = mistake_data.get("mistake_explanation", "")
-
             # Extract vocabulary words from the mistake explanation
             prompt = await self.prompt_manager.render_realtime_vocab_extraction_prompt(
-                mistake_explanation=mistake_explanation,
+                llm_response=llm_response,
                 onboarding_data=self.onboarding_data,
             )
 
@@ -420,10 +418,10 @@ class RealtimeAudioConversationAgent:
                 )
 
                 logfire.info(
-                    f"New vocabulary words saved from mistake: {', '.join(str(word) for word in vocab_response.vocab_words)}",
+                    f"New vocabulary words saved from llm response: {', '.join(str(word) for word in vocab_response.vocab_words)}",
                     onboarding_data=self.onboarding_data,
                     vocab_words=vocab_response.vocab_words,
-                    mistake_explanation=mistake_explanation,
+                    mistake_explanation=llm_response,
                 )
                 print(
                     "\033[1;32m🫙 New vocabulary words saved: "
@@ -433,16 +431,31 @@ class RealtimeAudioConversationAgent:
 
         except Exception as e:
             logfire.exception(
-                f"Error extracting vocab from mistake: {e}", mistake_data=mistake_data
+                f"Error extracting vocab from llm response: {e}",
+                llm_response=llm_response,
             )
 
-    async def _user_used_other_language_mistake(self, mistake_data: dict) -> str:
+    async def _user_asked_for_translation(self, llm_response: str) -> str:
         try:
-            mistake_explanation = mistake_data.get("mistake_explanation", "")
+            logfire.info(
+                f"User asked for translation: {llm_response}",
+                onboarding_data=self.onboarding_data,
+            )
 
+            print(
+                f"\033[1;33m🔧 User asked for translation: '{llm_response}'.  Vocab will be extracted and saved"
+            )
+
+            return f"Translate the words into {self.onboarding_data.target_language} as requested by user: {llm_response}.  Keep the conversation going in target language: {self.onboarding_data.target_language}"
+
+        except Exception as e:
+            logfire.error(f"Error processing translation request: {e}")
+            return f"Keep the conversation going in the target language: {self.onboarding_data.target_language}."
+
+    async def _user_used_other_language_mistake(self, mistake_explanation: str) -> str:
+        try:
             logfire.info(
                 f"Mistake recorded for {self.onboarding_data.name}: {mistake_explanation}",
-                mistake_data=mistake_data,
                 onboarding_data=self.onboarding_data,
             )
 
@@ -574,52 +587,54 @@ class RealtimeAudioConversationAgent:
 
             if function_name == "user_used_other_language_mistake":
                 arguments = json.loads(data.get("arguments", "{}"))
-                message = await self._user_used_other_language_mistake(arguments)
-
-                logfire.info(
-                    f"Sending user_used_other_language_mistake function call result: {message}",
-                )
-
-                # Send function call result back to the API
-                result_message = {
-                    "type": "conversation.item.create",
-                    "item": {
-                        "type": "function_call_output",
-                        "call_id": data.get("call_id"),
-                        "output": json.dumps(
-                            {
-                                "success": True,
-                                "message": message,
-                            }
-                        ),
-                    },
-                }
-
-                if not self.websocket or self.websocket.closed:
-                    raise RuntimeError(
-                        "WebSocket connection is not open. Cannot send function call result."
-                    )
-
-                await self.websocket.send(json.dumps(result_message))
-
-                # Trigger response generation after function call to keep conversation going
-                response_message = {"type": "response.create"}
-                await self.websocket.send(json.dumps(response_message))
-
-                # Schedule vocabulary extraction after a short delay since otherwise this seems
-                # slow down the response generation.  Not sure why
-                async def delayed_extract():
-                    await asyncio.sleep(1)
-                    await self._extract_vocabulary_from_mistake(arguments)
-
-                asyncio.create_task(delayed_extract())
-
+                llm_response = arguments.get("mistake_explanation", "")
+                message = await self._user_used_other_language_mistake(llm_response)
             elif function_name == "user_asked_for_translation":
                 arguments = json.loads(data.get("arguments", "{}"))
                 logfire.info(
                     "Processing user_asked_for_translation function call",
                     arguments=arguments,
                 )
+                llm_response = arguments.get("words_needing_translation", "")
+                message = await self._user_asked_for_translation(llm_response)
+
+            logfire.info(
+                f"Sending  function call result: {message}",
+            )
+
+            # Send function call result back to the API
+            result_message = {
+                "type": "conversation.item.create",
+                "item": {
+                    "type": "function_call_output",
+                    "call_id": data.get("call_id"),
+                    "output": json.dumps(
+                        {
+                            "success": True,
+                            "message": message,
+                        }
+                    ),
+                },
+            }
+
+            if not self.websocket or self.websocket.closed:
+                raise RuntimeError(
+                    "WebSocket connection is not open. Cannot send function call result."
+                )
+
+            await self.websocket.send(json.dumps(result_message))
+
+            # Trigger response generation after function call to keep conversation going
+            response_message = {"type": "response.create"}
+            await self.websocket.send(json.dumps(response_message))
+
+            # Schedule vocabulary extraction after a short delay since otherwise this seems
+            # slow down the response generation.  Not sure why
+            async def delayed_extract():
+                await asyncio.sleep(1)
+                await self._extract_vocabulary_from_llm_response(llm_response)
+
+            asyncio.create_task(delayed_extract())
 
         except Exception as e:
             logfire.exception(f"Error processing function call: {e}")

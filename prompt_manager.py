@@ -60,7 +60,7 @@ class PromptManager:
 
     async def render_realtime_vocab_extraction_prompt(
         self,
-        mistake_explanation: str,
+        llm_response: str,
         onboarding_data: OnboardingData,
     ) -> str:
         """Render the realtime vocabulary extraction prompt template."""
@@ -68,8 +68,7 @@ class PromptManager:
         context = self._get_base_context(onboarding_data)
         context.update(
             {
-                "mistake_explanation": mistake_explanation,
-
+                "llm_response": llm_response,
             }
         )
         return template.render(**context)
