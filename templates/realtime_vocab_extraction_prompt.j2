@@ -1,29 +1,12 @@
 You are helping {{ name }} learn {{ target_language }}.
 
-Your task is to analyze realtime conversation exchanges and detect when the user explicitly asks about vocabulary words,
-or implicitly signaled they do not know a word by saying the word in their native language 
-{{ native_language }} rather than the {{ target_language }}.
+Their language teacher identified the following mistake during a conversation exchange:
 
-{% if recent_conversation_history %}
-Recent conversation history:
-{% for message in recent_conversation_history %}
-{{ message }}
-{% endfor %}
-{% endif %}
+{{ mistake_explanation }}
 
-User transcript(s): "{{ user_transcripts }}"
-Assistant response: "{{ assistant_response }}"
-
-Analyze this conversation exchange to see if the user is explicitly asking about vocabulary words.
-If they are asking how to say something, what a word means, or similar vocabulary questions,
-extract those words in both {{ native_language }} and {{ target_language }}.
-
-Consider both the user's question and the assistant's response to understand what vocabulary was being discussed.
-Only extract words they specifically asked about, not every word they used.
+Extract the vocabulary words (if any) from this mistake and return them as a list of single words. 
+Focus on content words (nouns, verbs, adjectives) that are relevant to the conversation context.
 
 Response format:
-- assistant_message: Brief acknowledgment (not used in audio mode)
-- follow_up_question: Brief follow-up (not used in audio mode)
-- vocab_words_user_asked_about: List of vocabulary words they asked about
+- vocab_words_user_asked_about: List of extracted vocabulary words
 
-Each word should be a single word, not a phrase. Focus on content words (nouns, verbs, adjectives).

@@ -8,7 +8,7 @@ import queue
 import os
 from typing import List, Optional
 from onboarding import OnboardingData
-from models import ConversationResponse
+from models import VocabExtractResponse
 from database import get_database
 from prompt_manager import get_prompt_manager
 import logfire
@@ -31,7 +31,7 @@ class RealtimeAudioConversationAgent:
         )
         self.vocab_extraction_system_prompt = vocab_extraction_prompt
         self.vocab_extractor = self.factory.create_agent(
-            result_type=ConversationResponse,
+            result_type=VocabExtractResponse,
             system_prompt=vocab_extraction_prompt,
         )
 
@@ -383,29 +383,59 @@ class RealtimeAudioConversationAgent:
     async def _user_used_native_language_mistake(self, mistake_data: dict) -> str:
         """Record a language mistake made by the user."""
         try:
-            # Save mistake to database
-            # self.db.save_mistake(
-            #     mistake_text=mistake_data["mistake_text"],
-            #     correct_text=mistake_data["correct_text"],
-            #     mistake_type=mistake_data["mistake_type"],
-            #     explanation=mistake_data["explanation"],
-            #     native_language=self.onboarding_data.native_language,
-            #     target_language=self.onboarding_data.target_language,
-            #     user_id=getattr(self.onboarding_data, "user_id", None),
-            # )
+
+            mistake_explanation = mistake_data.get("mistake_explanation", "")
 
             logfire.info(
-                f"Mistake recorded for {self.onboarding_data.name}: {mistake_data['mistake_explanation']}",
+                f"Mistake recorded for {self.onboarding_data.name}: {mistake_explanation}",
                 mistake_data=mistake_data,
                 onboarding_data=self.onboarding_data,
             )
 
             print(
-                f"\033[1;33m🔧 Mistake recorded: '{mistake_data['mistake_explanation']}'"
+                f"\033[1;33m🔧 Mistake recorded: '{mistake_explanation}'"
             )
 
+            # Extract vocabulary words from the mistake explanation
+            prompt = await self.prompt_manager.render_realtime_vocab_extraction_prompt(
+                mistake_explanation=mistake_explanation,
+                onboarding_data=self.onboarding_data,
+            )
+
+            # Use async version instead of sync
+            result = await self.vocab_extractor.run(prompt)
+
+            logfire.info(
+                f"Vocab extractor agent result for {self.onboarding_data.name}",
+                result=result.data,
+                prompt=prompt,
+                system_prompt=self.vocab_extraction_system_prompt,
+                onboarding_data=self.onboarding_data,
+            )
+
+            # Save to database
+            vocab_response = result.data
+            if vocab_response.vocab_words:
+                self.db.save_vocab_words(
+                    vocab_response.vocab_words,
+                    self.onboarding_data.native_language,
+                    self.onboarding_data.target_language,
+                )
+
+                logfire.info(
+                    f"New vocabulary words saved from mistake: {', '.join(str(word) for word in vocab_response.vocab_words)}",
+                    onboarding_data=self.onboarding_data,
+                    vocab_words=vocab_response.vocab_words,
+                    mistake_explanation=mistake_explanation,
+                )
+                print(
+                    "\033[1;32mNew vocabulary words saved: "
+                    + ", ".join(str(word) for word in vocab_response.vocab_words)
+                    + "\033[0m"
+                )
+
             return (
-                f"Explain the mistake to the user {mistake_data['mistake_explanation']} in "
+                f"Explain the mistake to the user {mistake_explanation} in "
                 + f"their native language {self.onboarding_data.native_language}, and keep "
                 + f"the conversation going in the target language {self.onboarding_data.target_language}."
             )
@@ -631,17 +661,17 @@ class RealtimeAudioConversationAgent:
         if len(self.conversation_history) > self.max_history:
             self.conversation_history = self.conversation_history[-self.max_history :]
 
-    def get_response(self, user_message: str) -> ConversationResponse:
-        """Get AI response to user message in realtime audio mode."""
-        # For compatibility with text mode interface
-        # In actual realtime mode, this won't be used much
-        self.add_to_history(user_message)
+    # def get_response(self, user_message: str) -> ConversationResponse:
+    #     """Get AI response to user message in realtime audio mode."""
+    #     # For compatibility with text mode interface
+    #     # In actual realtime mode, this won't be used much
+    #     self.add_to_history(user_message)
 
-        return ConversationResponse(
-            assistant_message="In realtime audio mode - responses are provided via voice.",
-            follow_up_question="Continue speaking to practice your conversation skills!",
-            vocab_words_user_asked_about=[],
-        )
+    #     return ConversationResponse(
+    #         assistant_message="In realtime audio mode - responses are provided via voice.",
+    #         follow_up_question="Continue speaking to practice your conversation skills!",
+    #         vocab_words_user_asked_about=[],
+    #     )
 
     async def send_text_message(self, message: str):
         """Send a text message to the conversation (useful for commands)."""

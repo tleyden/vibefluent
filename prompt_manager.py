@@ -58,11 +58,9 @@ class PromptManager:
         context.update({"vocab_context": vocab_context})
         return template.render(**context)
 
-    def render_realtime_vocab_extraction_prompt(
+    async def render_realtime_vocab_extraction_prompt(
         self,
-        user_transcripts: str,
-        assistant_response: str,
-        recent_conversation_history: List[str],
+        mistake_explanation: str,
         onboarding_data: OnboardingData,
     ) -> str:
         """Render the realtime vocabulary extraction prompt template."""
@@ -70,9 +68,8 @@ class PromptManager:
         context = self._get_base_context(onboarding_data)
         context.update(
             {
-                "user_transcripts": user_transcripts,
-                "assistant_response": assistant_response,
-                "recent_conversation_history": recent_conversation_history,
+                "mistake_explanation": mistake_explanation,
+
             }
         )
         return template.render(**context)

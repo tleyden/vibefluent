@@ -14,3 +14,8 @@ class ConversationResponse(BaseModel):
     assistant_message: str
     follow_up_question: str
     vocab_words_user_asked_about: List[VocabWord] = []
+
+
+
+class VocabExtractResponse(BaseModel):
+    vocab_words: List[VocabWord] = []
