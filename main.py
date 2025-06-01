@@ -239,94 +239,90 @@ def run_realtime_audio_loop(conversation_agent, onboarding_data):
         print("- Press Enter: Start/stop recording")
         print("=" * 60 + "\n")
 
-        # Create tasks for handling WebSocket and user input
-        input_task = asyncio.create_task(
-            handle_realtime_input(conversation_agent, onboarding_data)
-        )
+        # # Create tasks for handling WebSocket and user input
+        # input_task = asyncio.create_task(
+        #     handle_realtime_input(conversation_agent, onboarding_data)
+        # )
 
-        try:
-            await input_task
-        except KeyboardInterrupt:
-            print(f"\n\nGoodbye, {onboarding_data.name}! Thanks for practicing! 👋")
-        finally:
-            await conversation_agent.stop_conversation()
+        # try:
+        #     await input_task
+        # except KeyboardInterrupt:
+        #     print(f"\n\nGoodbye, {onboarding_data.name}! Thanks for practicing! 👋")
+        # finally:
+        #     await conversation_agent.stop_conversation()
 
     # Run the async audio loop
-    try:
-        asyncio.run(audio_loop())
-    except Exception as e:
-        print(f"Error in realtime audio mode: {e}")
-        print("Falling back to text mode...")
+    asyncio.run(audio_loop())
 
 
-async def handle_realtime_input(conversation_agent, onboarding_data):
-    """Handle user input during realtime audio mode."""
-    loop = asyncio.get_event_loop()
+# async def handle_realtime_input(conversation_agent, onboarding_data):
+#     """Handle user input during realtime audio mode."""
+#     loop = asyncio.get_event_loop()
 
-    while True:
-        try:
-            # Get user input in a non-blocking way
-            user_input = await loop.run_in_executor(
-                None, get_user_input, "Command (or Enter to toggle recording): "
-            )
+#     while True:
+#         try:
+#             # Get user input in a non-blocking way
+#             user_input = await loop.run_in_executor(
+#                 None, get_user_input, "Command (or Enter to toggle recording): "
+#             )
 
-            # Check for exit commands
-            if user_input.lower() in ["quit", "exit", "q"]:
-                print(
-                    f"\nGoodbye, {onboarding_data.name}! Keep practicing your {onboarding_data.target_language}! 🎉"
-                )
-                break
+#             # Check for exit commands
+#             if user_input.lower() in ["quit", "exit", "q"]:
+#                 print(
+#                     f"\nGoodbye, {onboarding_data.name}! Keep practicing your {onboarding_data.target_language}! 🎉"
+#                 )
+#                 break
 
-            # Check for re-onboard command
-            if user_input == "re-onboard":
-                print("\n🔄 Re-onboarding Mode! 🔄")
-                print("Let's update your profile settings...")
+#             # Check for re-onboard command
+#             if user_input == "re-onboard":
+#                 print("\n🔄 Re-onboarding Mode! 🔄")
+#                 print("Let's update your profile settings...")
 
-                # Stop current conversation
-                await conversation_agent.stop_conversation()
+#                 # Stop current conversation
+#                 await conversation_agent.stop_conversation()
 
-                # Delete existing onboarding data
-                from database import get_database
+#                 # Delete existing onboarding data
+#                 from database import get_database
 
-                db = get_database()
-                db.delete_onboarding_data()
+#                 db = get_database()
+#                 db.delete_onboarding_data()
 
-                # Run onboarding again
-                from onboarding import run_onboarding
+#                 # Run onboarding again
+#                 from onboarding import run_onboarding
 
-                new_onboarding_data = run_onboarding()
+#                 new_onboarding_data = run_onboarding()
 
-                print(f"\nProfile updated successfully, {new_onboarding_data.name}!")
-                print(
-                    f"Now ready to help you learn {new_onboarding_data.target_language}!"
-                )
+#                 print(f"\nProfile updated successfully, {new_onboarding_data.name}!")
+#                 print(
+#                     f"Now ready to help you learn {new_onboarding_data.target_language}!"
+#                 )
 
-                # Create new conversation agent
-                conversation_agent = RealtimeAudioConversationAgent(new_onboarding_data)
+#                 # Create new conversation agent
+#                 conversation_agent = RealtimeAudioConversationAgent(new_onboarding_data)
 
-                # Restart conversation
-                success = await conversation_agent.start_conversation()
-                if not success:
-                    print("Failed to restart realtime audio mode.")
-                    break
+#                 # Restart conversation
+#                 success = await conversation_agent.start_conversation()
+#                 if not success:
+#                     print("Failed to restart realtime audio mode.")
+#                     break
 
-                continue
+#                 continue
 
-            # Toggle recording on Enter (empty input)
-            if not user_input:
-                if conversation_agent.is_recording:
-                    print("🔴 Recording paused - press Enter to resume")
-                    conversation_agent.is_recording = False
-                else:
-                    print("🎤 Recording resumed - speak naturally!")
-                    conversation_agent.is_recording = True
-                continue
+#             # Toggle recording on Enter (empty input)
+#             if not user_input:
+#                 if conversation_agent.is_recording:
+#                     print("🔴 Recording paused - press Enter to resume")
+#                     conversation_agent.is_recording = False
+#                 else:
+#                     print("🎤 Recording resumed - speak naturally!")
+#                     conversation_agent.is_recording = True
+#                 continue
 
-            # Send text commands to the conversation
-            await conversation_agent.send_text_message(user_input)
+#             # Send text commands to the conversation
+#             await conversation_agent.send_text_message(user_input)
 
-        except (EOFError, KeyboardInterrupt):
-            break
+#         except (EOFError, KeyboardInterrupt):
+#             break
 
 
 def main():
@@ -345,7 +341,7 @@ def main():
                 token=LOGFIRE_API_KEY,
                 service_name=service_name,
                 environment=environment,
-                console=False,
+                # console=False,
             )
         else:
             logfire.configure(
