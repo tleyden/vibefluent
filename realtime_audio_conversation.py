@@ -823,7 +823,7 @@ class RealtimeAudioConversationAgent:
         await self._connect_websocket_start_audio_streams()
 
         async def delayed_kick_off_conversation():
-            await asyncio.sleep(2)
+            await asyncio.sleep(3)
             # Kick off the conversation
             logfire.info("Starting conversation with initial message")
             await self.send_text_message("Greet the user and start the conversation.")
