@@ -458,6 +458,9 @@ class RealtimeAudioConversationAgent:
         self._start_audio_input_stream()
         self._start_audio_output_stream()
 
+        # Kick off the conversation
+        await self.send_text_message("Greet the user and start the conversation.")
+
         # Start handling WebSocket messages - this blocks indefinitely
         logfire.info("Starting to handle WebSocket messages")
         await self._handle_websocket_messages()
