@@ -17,4 +17,4 @@ TEXT = "TEXT"
 # MODE = "TEXT"  # Options: "TEXT" or REALTIME_AUDIO_CONVERSATION
 
 # To enable realtime audio mode, change MODE to:
-MODE = REALTIME_AUDIO_DRILL
+MODE = REALTIME_AUDIO_CONVERSATION

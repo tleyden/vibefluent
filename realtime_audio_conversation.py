@@ -157,8 +157,7 @@ class RealtimeAudioConversationAgent:
                         "type": "function",
                         "name": "user_used_other_language_mistake",
                         "description": f"""
-                        This function will be called when the user responds with any words in their native language {self.onboarding_data.native_language}, 
-                        or any other language rather than the target language {self.onboarding_data.target_language}
+                        This function will be called when the user responds with any words in another language rather than the target language {self.onboarding_data.target_language}
                         """,
                         "parameters": {
                             "type": "object",
@@ -380,7 +379,11 @@ class RealtimeAudioConversationAgent:
                 f"\033[1;33m🔧 User asked for translation: '{llm_response}'.  Vocab will be extracted and saved"
             )
 
-            return f"Translate the words into {self.onboarding_data.target_language} as requested by user: {llm_response}.  Keep the conversation going in target language: {self.onboarding_data.target_language}"
+            return (
+                f"Translate the words into {self.onboarding_data.target_language} as requested by user: {llm_response}. "
+                + "Make sure that you mention that you have made a note for future practice. "
+                + "Keep the conversation going in target language: {self.onboarding_data.target_language}"
+            )
 
         except Exception as e:
             logfire.error(f"Error processing translation request: {e}")
@@ -399,7 +402,8 @@ class RealtimeAudioConversationAgent:
 
             return (
                 f"Explain the mistake to the user {mistake_explanation} in "
-                + f"their native language {self.onboarding_data.native_language}, and keep "
+                + f"their native language {self.onboarding_data.native_language}.  Make sure you mention "
+                + "that you have made a note for future practice, and keep "
                 + f"the conversation going in the target language {self.onboarding_data.target_language}."
             )
 
