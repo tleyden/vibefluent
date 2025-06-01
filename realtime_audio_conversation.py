@@ -152,7 +152,47 @@ class RealtimeAudioConversationAgent:
                     "prefix_padding_ms": 300,
                     "silence_duration_ms": 400,
                 },
-                "tools": [],
+                "tools": [
+                    {
+                        "type": "function",
+                        "name": "record_mistake",
+                        "description": "Record a language mistake made by the user during conversation",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "mistake_text": {
+                                    "type": "string",
+                                    "description": "The incorrect text or phrase the user said",
+                                },
+                                "correct_text": {
+                                    "type": "string",
+                                    "description": "The correct way to say it in the target language",
+                                },
+                                "mistake_type": {
+                                    "type": "string",
+                                    "enum": [
+                                        "grammar",
+                                        "pronunciation",
+                                        "vocabulary",
+                                        "word_order",
+                                        "conjugation",
+                                    ],
+                                    "description": "The type of mistake made",
+                                },
+                                "explanation": {
+                                    "type": "string",
+                                    "description": "Brief explanation of why it's incorrect and how to fix it",
+                                },
+                            },
+                            "required": [
+                                "mistake_text",
+                                "correct_text",
+                                "mistake_type",
+                                "explanation",
+                            ],
+                        },
+                    }
+                ],
                 "tool_choice": "auto",
                 "temperature": 0.8,
                 "max_response_output_tokens": 4096,
@@ -350,6 +390,33 @@ class RealtimeAudioConversationAgent:
         except Exception as e:
             logfire.error(f"Error processing user transcript for vocab: {e}")
 
+    async def _record_mistake(self, mistake_data: dict):
+        """Record a language mistake made by the user."""
+        try:
+            # Save mistake to database
+            self.db.save_mistake(
+                mistake_text=mistake_data["mistake_text"],
+                correct_text=mistake_data["correct_text"],
+                mistake_type=mistake_data["mistake_type"],
+                explanation=mistake_data["explanation"],
+                native_language=self.onboarding_data.native_language,
+                target_language=self.onboarding_data.target_language,
+                user_id=getattr(self.onboarding_data, "user_id", None),
+            )
+
+            logfire.info(
+                f"Mistake recorded for {self.onboarding_data.name}",
+                mistake_data=mistake_data,
+                onboarding_data=self.onboarding_data,
+            )
+
+            print(
+                f"\033[1;33m🔧 Mistake recorded: '{mistake_data['mistake_text']}' → '{mistake_data['correct_text']}'\033[0m"
+            )
+
+        except Exception as e:
+            logfire.error(f"Error recording mistake: {e}")
+
     async def _process_websocket_message(self, data):
         """Process different types of messages from the API."""
         message_type = data.get("type")
@@ -443,6 +510,45 @@ class RealtimeAudioConversationAgent:
                 logfire.debug(f"Cancellation attempt failed (expected): {error_msg}")
             else:
                 logfire.error(f"API error: {error_msg}")
+
+        elif message_type == "response.function_call_arguments.delta":
+            # Function call arguments being streamed
+            pass
+
+        elif message_type == "response.function_call_arguments.done":
+            # Function call arguments complete - handle tool calls
+            item = data.get("item", {})
+            if item.get("type") == "function_call":
+                function_name = item.get("name")
+                if function_name == "record_mistake":
+                    try:
+                        arguments = json.loads(item.get("arguments", "{}"))
+                        await self._record_mistake(arguments)
+
+                        # Send function call result back to the API
+                        result_message = {
+                            "type": "conversation.item.create",
+                            "item": {
+                                "type": "function_call_output",
+                                "call_id": item.get("call_id"),
+                                "output": json.dumps(
+                                    {
+                                        "success": True,
+                                        "message": "Mistake recorded successfully",
+                                    }
+                                ),
+                            },
+                        }
+                        await self.websocket.send(json.dumps(result_message))
+
+                        # Trigger response generation to continue conversation
+                        response_message = {"type": "response.create"}
+                        await self.websocket.send(json.dumps(response_message))
+
+                    except Exception as e:
+                        logfire.error(
+                            f"Error processing record_mistake function call: {e}"
+                        )
 
     async def start_conversation(self):
         """Start the realtime audio conversation."""
