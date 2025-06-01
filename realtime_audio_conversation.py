@@ -514,13 +514,15 @@ class RealtimeAudioConversationAgent:
         elif message_type == "response.function_call_arguments.delta":
             # Function call arguments being streamed
             logfire.info(
-                "Received function call arguments delta - this is a stream, not final output"
+                "Received function call arguments delta - this is a stream, not final output",
+                data=data,
             )
             pass
 
         elif message_type == "response.function_call_arguments.done":
             logfire.info(
-                "Received function call arguments (final output) - processing function call"
+                "Received function call arguments (final output) - processing function call",
+                data=data,
             )
             # Function call arguments complete - handle tool calls
             item = data.get("item", {})
@@ -550,7 +552,7 @@ class RealtimeAudioConversationAgent:
                             raise RuntimeError(
                                 "WebSocket connection is not open. Cannot send function call result."
                             )
-                        
+
                         await self.websocket.send(json.dumps(result_message))
 
                         # # Trigger response generation to continue conversation
