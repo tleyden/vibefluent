@@ -199,6 +199,26 @@ class RealtimeAudioConversationAgent:
                     },
                     {
                         "type": "function",
+                        "name": "user_asked_to_save_vocab_word",
+                        "description": """
+                            If the user explicitly asks to save a word or phrase for vocabulary drills 
+                            this tool will save that word or phrase for future drills.
+                        """,
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "word_or_phrase_to_save": {
+                                    "type": "string",
+                                    "description": "The word or words that the user asked to save",
+                                },
+                            },
+                            "required": [
+                                "word_or_phrase_to_save",
+                            ],
+                        },
+                    },
+                    {
+                        "type": "function",
                         "name": "user_wants_vocab_drill",
                         "description": """
                             If the user explicitly asks to do vocabulary drills or practice  
@@ -402,6 +422,26 @@ class RealtimeAudioConversationAgent:
         except Exception as e:
             logfire.error(f"Error processing translation request: {e}")
             return f"Keep the conversation going in the target language: {self.onboarding_data.target_language}."
+        
+    async def _user_asked_to_save_vocab_word(self, llm_response: str) -> str:
+        try:
+            logfire.info(
+                f"User asked to save vocab word: {llm_response}",
+                onboarding_data=self.onboarding_data,
+            )
+
+            print(
+                f"\033[1;33m🔧 User asked to save vocab word: '{llm_response}'.  Vocab will be saved for future practice"
+            )
+
+            return (
+                f"Tell the user you saved the word or words in '{llm_response}' for future practice. "
+                + "Keep the conversation going in target language: {self.onboarding_data.target_language}"
+            )
+
+        except Exception as e:
+            logfire.error(f"Error processing save vocab request: {e}")
+            return f"Keep the conversation going in the target language: {self.onboarding_data.target_language}."
 
     async def _user_used_other_language_mistake(self, mistake_explanation: str) -> str:
         try:
@@ -561,6 +601,7 @@ class RealtimeAudioConversationAgent:
             vocab_function_calls = [
                 "user_used_other_language_mistake",
                 "user_asked_for_translation",
+                "user_asked_to_save_vocab_word"
             ]
 
             logfire.info("processing function call", data=data)
@@ -643,6 +684,14 @@ class RealtimeAudioConversationAgent:
             )
             llm_response = arguments.get("words_needing_translation", "")
             message = await self._user_asked_for_translation(llm_response)
+        elif function_name == "user_asked_to_save_vocab_word":
+            arguments = json.loads(data.get("arguments", "{}"))
+            logfire.info(
+                "Processing user_asked_to_save_vocab_word function call",
+                arguments=arguments,
+            )
+            llm_response = arguments.get("word_or_phrase_to_save", "")
+            message = await self._user_asked_to_save_vocab_word(llm_response)
 
         logfire.info(
             f"Sending  function call result: {message}",
