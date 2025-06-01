@@ -2,9 +2,8 @@ from onboarding import load_onboarding_data, run_onboarding
 from conversation import run_text_conversation_loop
 from realtime_audio_conversation import (
     run_realtime_conversation_loop,
-    run_realtime_drill_loop,
 )
-from constants import MODE, REALTIME_AUDIO_CONVERSATION, REALTIME_AUDIO_DRILL, TEXT
+from constants import MODE, REALTIME_AUDIO_CONVERSATION, TEXT
 from dotenv import load_dotenv
 import logfire
 from logfire import ConsoleOptions
@@ -64,8 +63,6 @@ def main():
     # Initialize agents and database based on mode
     if MODE == REALTIME_AUDIO_CONVERSATION:
         run_realtime_conversation_loop(onboarding_data)
-    elif MODE == REALTIME_AUDIO_DRILL:
-        run_realtime_drill_loop(onboarding_data)
     else:  # Default to TEXT mode
         run_text_conversation_loop(onboarding_data)
 

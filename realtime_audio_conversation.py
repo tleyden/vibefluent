@@ -743,27 +743,6 @@ class RealtimeAudioConversationAgent:
             self.audio.terminate()
 
 
-class RealtimeAudioDrillAgent(RealtimeAudioConversationAgent):
-    async def start_conversation(self):
-        """Start the realtime audio conversation."""
-
-        await self._connect_websocket_start_audio_streams()
-
-        # Kick off the conversation
-        await self.send_text_message(
-            "We want to user to practice a vocabulary drill.  Give the user the following drill: How do you say 'I am' in spanish? and expect a valid response until they get it right."
-        )
-
-        # Start handling WebSocket messages - this blocks indefinitely
-        logfire.info("Starting to handle WebSocket messages")
-        await self._handle_websocket_messages()
-        logfire.info("Finished handling WebSocket messages")
-
-        return True
-
-    pass
-
-
 def run_realtime_audio_loop(conversation_agent: RealtimeAudioConversationAgent):
     """Run the realtime audio conversation loop."""
 
@@ -798,25 +777,3 @@ def run_realtime_conversation_loop(onboarding_data):
 
     conversation_agent = RealtimeAudioConversationAgent(onboarding_data)
     return run_realtime_audio_loop(conversation_agent)
-
-
-def run_realtime_drill_loop(onboarding_data):
-    """
-    How the drill mode works:
-
-    1. Generate a drill question
-    2. Call send_text_message to send the question to the agent
-    3. Wait for what exactly?  There could be back and forth conversation about the drill?
-
-
-    """
-    print("\n" + "=" * 60)
-    print("🔧 Welcome to your vocabulary drill! 🔧")
-    print(f"Mode: {MODE}")
-    print("Type 'quit' or 'exit' to end the drill")
-    print("Type 're-onboard' to update your profile settings")
-    print("Press Ctrl+C to exit anytime")
-    print("=" * 60 + "\n")
-
-    drill_agent = RealtimeAudioDrillAgent(onboarding_data)
-    return run_realtime_audio_loop(drill_agent)
