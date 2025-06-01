@@ -598,16 +598,10 @@ class RealtimeAudioConversationAgent:
                 response_message = {"type": "response.create"}
                 await self.websocket.send(json.dumps(response_message))
 
-                # await self._extract_vocabulary_from_mistake(arguments)
-                # Sleep in case this is blocking other stuff.
-                # asyncio.create_task(
-                #     (
-                #         lambda: asyncio.sleep(15)
-                #         and self._extract_vocabulary_from_mistake(arguments)
-                #     )()
-                # )
+                # Schedule vocabulary extraction after a short delay since otherwise this seems
+                # slow down the response generation.  Not sure why
                 async def delayed_extract():
-                    await asyncio.sleep(15)
+                    await asyncio.sleep(1)
                     await self._extract_vocabulary_from_mistake(arguments)
 
                 asyncio.create_task(delayed_extract())
@@ -646,8 +640,6 @@ class RealtimeAudioConversationAgent:
         except Exception as e:
             logfire.exception(f"Error processing function call: {e}")
             return
-
-
 
     async def start_conversation(self):
         """Start the realtime audio conversation."""
