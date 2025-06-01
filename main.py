@@ -32,25 +32,31 @@ def get_user_input(prompt: str = "You: ") -> str:
         print("\n\nGoodbye! Thanks for using VibeFluent! 👋")
         sys.exit(0)
 
+def run_realtime_conversation_loop(onboarding_data):
+    print("\n" + "=" * 60)
+    print("🌍 Welcome to your conversation practice! 🌍")
+    print(f"Mode: {MODE}")
+    print("Type 'quit' or 'exit' to end the conversation")
+    print("Type 're-onboard' to update your profile settings")
+    print("Press Ctrl+C to exit anytime")
+    print("=" * 60 + "\n")
 
-def run_conversation_loop(onboarding_data):
+    conversation_agent = RealtimeAudioConversationAgent(onboarding_data)
+    return run_realtime_audio_loop(conversation_agent, onboarding_data)
+
+
+def run_text_conversation_loop(onboarding_data):
     """Run the main conversation loop with drill mode support."""
     print("\n" + "=" * 60)
     print("🌍 Welcome to your conversation practice! 🌍")
     print(f"Mode: {MODE}")
     print("Type 'quit' or 'exit' to end the conversation")
-    if MODE != "REALTIME_AUDIO":
-        print("Type 'drill mode' to enter vocabulary drill mode")
+    print("Type 'drill mode' to enter vocabulary drill mode")
     print("Type 're-onboard' to update your profile settings")
     print("Press Ctrl+C to exit anytime")
     print("=" * 60 + "\n")
 
-    # Initialize agents and database based on mode
-    if MODE == "REALTIME_AUDIO":
-        conversation_agent = RealtimeAudioConversationAgent(onboarding_data)
-        return run_realtime_audio_loop(conversation_agent, onboarding_data)
-    else:  # Default to TEXT mode
-        conversation_agent = ConversationAgent(onboarding_data)
+    conversation_agent = ConversationAgent(onboarding_data)
 
     drill_agent = VocabDrillAgent(onboarding_data)
     db = get_database()
@@ -363,7 +369,11 @@ def main():
         print(f"Continuing your {onboarding_data.target_language} learning journey...")
 
     # Start the conversation loop
-    run_conversation_loop(onboarding_data)
+    # Initialize agents and database based on mode
+    if MODE == "REALTIME_AUDIO":
+        run_realtime_conversation_loop(onboarding_data)
+    else:  # Default to TEXT mode
+        run_text_conversation_loop(onboarding_data) 
 
 
 if __name__ == "__main__":
