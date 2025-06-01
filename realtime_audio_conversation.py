@@ -245,8 +245,12 @@ class RealtimeAudioConversationAgent:
                                     "type": "string",
                                     "description": f"The drill word in {self.onboarding_data.target_language}",
                                 },
+                                "drill_score": {
+                                    "type": "boolean",
+                                    "description": "Did the user pass or fail the drill for this word? True if passed, False if failed.",
+                                },
                             },
-                            "required": ["drill_word_target_language"],
+                            "required": ["drill_word_target_language", "drill_score"],
                         },
                     },
                 ],
@@ -642,65 +646,93 @@ class RealtimeAudioConversationAgent:
                     data=data,
                 )
                 # TODO: implement vocab drill result processing and respond to keep conversation going
+                await self._process_vocab_drill_result(data)
 
             elif function_name == "user_wants_vocab_drill":
-                vocab_words = self.db.get_all_vocab_words(self.onboarding_data)
-                message = f"""
-                The user wants to do vocabulary drills.  Run the user through a vocabulary drill session with the following words:
-
-                {vocab_words}
-
-                Before moving onto the next word, try to make sure the user has passed the drill.  However, give up after 3 or 4 attempts
-                if it's too difficult for the user.  If the user is struggling, try to give them a hint or explain the word in their native language.
-
-                Here are some ideas for drill formats you can use, but feel free to come up with your own:
-
-                - Translation drills: "How do you say [native word] in {self.onboarding_data.target_language}?"
-                - Definition drills: "What does [target word] mean in {self.onboarding_data.native_language}?"
-                - Context drills: "Use the word [target word] in a sentence"
-                - Reverse translation: "What's the {self.onboarding_data.native_language} word for [target word]?"
-                - Listening comprehension: "Speak out 3-4 sentences in {self.onboarding_data.native_language}, and ask the user questions to test their comprehension of the sentences, focusing on the vocabulary words in the questions."
-
-                After finishing with drills, avoid asking the user what they want to talk about, since they often don't know. Instead, suggest topics based on their interests and previous conversations.
-                """
-
                 logfire.info(
-                    "Sending function call result for user_wants_vocab_drill",
-                    message=message,
+                    "Processing user_wants_vocab_drill function call",
+                    data=data,
                 )
-
-                # Send function call result back to the API
-                result_message = {
-                    "type": "conversation.item.create",
-                    "item": {
-                        "type": "function_call_output",
-                        "call_id": data.get("call_id"),
-                        "output": json.dumps(
-                            {
-                                "success": True,
-                                "message": message,
-                            }
-                        ),
-                    },
-                }
-
-                if not self.websocket or self.websocket.closed:
-                    raise RuntimeError(
-                        "WebSocket connection is not open. Cannot send function call result."
-                    )
-
-                await self.websocket.send(json.dumps(result_message))
-
-                # Trigger response generation after function call to keep conversation going
-                response_message = {"type": "response.create"}
-                await self.websocket.send(json.dumps(response_message))
-
+                await self._process_user_wants_vocab_drill(data)
             else:
                 raise RuntimeError(f"Unsupported function call: {function_name}. ")
 
         except Exception as e:
             logfire.exception(f"Error processing function call: {e}")
             return
+
+    async def _process_vocab_drill_result(self, data):
+        arguments = json.loads(data.get("arguments", "{}"))
+        drill_word_target_language = arguments.get("drill_word_target_language", "")
+        drill_score = arguments.get("drill_score", False)
+        logfire.info(
+            f"Processing vocab drill result. Pass/fail: {drill_score} for word: {drill_word_target_language}",
+            drill_word_target_language=drill_word_target_language,
+            drill_score=drill_score,
+        )
+
+        # TODO: update the DB with the result of the vocab drill
+
+        await self._create_response_keep_conversation_going()
+
+    async def _process_user_wants_vocab_drill(self, data):
+        vocab_words = self.db.get_all_vocab_words(self.onboarding_data)
+        message = f"""
+        The user wants to do vocabulary drills.  Run the user through a vocabulary drill session with the following words:
+
+        {vocab_words}
+
+        Before moving onto the next word, try to make sure the user has passed the drill.  However, give up after 3 or 4 attempts
+        if it's too difficult for the user.  If the user is struggling, try to give them a hint or explain the word in their native language.
+
+        Here are some ideas for drill formats you can use, but feel free to come up with your own:
+
+        - Translation drills: "How do you say [native word] in {self.onboarding_data.target_language}?"
+        - Definition drills: "What does [target word] mean in {self.onboarding_data.native_language}?"
+        - Context drills: "Use the word [target word] in a sentence"
+        - Reverse translation: "What's the {self.onboarding_data.native_language} word for [target word]?"
+        - Listening comprehension: "Speak out 3-4 sentences in {self.onboarding_data.native_language}, and ask the user questions to test their comprehension of the sentences, focusing on the vocabulary words in the questions."
+
+        After finishing with drills, avoid asking the user what they want to talk about, since they often don't know. Instead, suggest topics based on their interests and previous conversations.
+        """
+
+        logfire.info(
+            "Sending function call result for user_wants_vocab_drill",
+            message=message,
+        )
+
+        # Send function call result back to the API
+        result_message = {
+            "type": "conversation.item.create",
+            "item": {
+                "type": "function_call_output",
+                "call_id": data.get("call_id"),
+                "output": json.dumps(
+                    {
+                        "success": True,
+                        "message": message,
+                    }
+                ),
+            },
+        }
+
+        if not self.websocket or self.websocket.closed:
+            raise RuntimeError(
+                "WebSocket connection is not open. Cannot send function call result."
+            )
+
+        await self.websocket.send(json.dumps(result_message))
+
+        await self._create_response_keep_conversation_going()
+
+    async def _create_response_keep_conversation_going(self):
+        # Trigger response generation after function call to keep conversation going
+        response_message = {"type": "response.create"}
+        if not self.websocket or self.websocket.closed:
+            raise RuntimeError(
+                "WebSocket connection is not open. Cannot send response creation message."
+            )
+        await self.websocket.send(json.dumps(response_message))
 
     async def process_vocab_function_call(self, function_name: str, data):
         if function_name == "user_used_other_language_mistake":
@@ -750,9 +782,7 @@ class RealtimeAudioConversationAgent:
 
         await self.websocket.send(json.dumps(result_message))
 
-        # Trigger response generation after function call to keep conversation going
-        response_message = {"type": "response.create"}
-        await self.websocket.send(json.dumps(response_message))
+        await self._create_response_keep_conversation_going()
 
         # Schedule vocabulary extraction after a short delay since otherwise this seems
         # slow down the response generation.  Not sure why
@@ -813,9 +843,7 @@ class RealtimeAudioConversationAgent:
             }
             await self.websocket.send(json.dumps(text_message))
 
-            # Trigger response generation
-            response_message = {"type": "response.create"}
-            await self.websocket.send(json.dumps(response_message))
+            await self._create_response_keep_conversation_going()
 
     def __del__(self):
         """Cleanup audio resources."""
