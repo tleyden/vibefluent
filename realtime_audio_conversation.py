@@ -89,6 +89,10 @@ class RealtimeAudioConversationAgent:
             "OpenAI-Beta": "realtime=v1",
         }
 
+        logfire.info(
+            f"Connecting to OpenAI Realtime API for {self.onboarding_data.name} at {url}"
+        )
+
         try:
             self.websocket = await websockets.connect(url, extra_headers=headers)
             logfire.info(
@@ -262,9 +266,7 @@ class RealtimeAudioConversationAgent:
             )
 
         await self.websocket.send(json.dumps(config))
-        logfire.info(
-            "Session configured for realtime audio"
-        )
+        logfire.info("Session configured for realtime audio")
 
     def _start_audio_input_stream(self):
         """Start recording audio from microphone."""
@@ -365,14 +367,20 @@ class RealtimeAudioConversationAgent:
         while self.websocket and not self.websocket.closed:
             try:
                 message = await self.websocket.recv()
+                if message is None:
+                    continue
                 data = json.loads(message)
+                if data is None:
+                    continue
 
                 await self._process_websocket_message(data)
 
             except websockets.exceptions.ConnectionClosed as e:
                 raise RuntimeError("WebSocket connection closed unexpectedly") from e
             except Exception as e:
-                logfire.error(f"WebSocket message handling error: {e}.  Retrying...")
+                logfire.exception(
+                    f"WebSocket message handling error: {e}.  Retrying...", self=self
+                )
 
     async def _extract_vocabulary_from_llm_response(self, llm_response: str):
         try:
@@ -493,11 +501,6 @@ class RealtimeAudioConversationAgent:
         """Process different types of messages from the API."""
         message_type = data.get("type")
 
-        logfire.trace(
-            f"Received message of type: {message_type}",
-            data=data,
-        )
-
         # Map message types to their handler methods
         handler_map = {
             "response.audio.delta": self._handle_response_audio_delta,
@@ -513,6 +516,7 @@ class RealtimeAudioConversationAgent:
             "error": self._handle_error,
             "response.function_call_arguments.delta": self._handle_response_function_call_arguments_delta,
             "response.function_call_arguments.done": self._handle_response_function_call_arguments_done,
+            "conversation.item.created": self._handle_conversation_item_created,
         }
 
         handler = handler_map.get(message_type)
@@ -520,6 +524,19 @@ class RealtimeAudioConversationAgent:
             await handler(data)
         else:
             logfire.debug(f"Unhandled message type: {message_type}")
+
+    async def _handle_conversation_item_created(self, data):
+        # Process the newly created conversation item
+        item = data.get("item", {})
+        item_type = item.get("type")
+        role = item.get("role")
+        content = item.get("content", [])
+
+        # Implement your logic here
+        logfire.info(
+            f"New conversation item added: type={item_type}, role={role}, content={content}",
+            data=data,
+        )
 
     async def _handle_response_audio_delta(self, data):
         """Handle response.audio.delta messages."""
@@ -670,7 +687,6 @@ class RealtimeAudioConversationAgent:
         await self._create_response_keep_conversation_going()
 
     async def _process_user_wants_vocab_drill(self, data):
-
         vocab_words = self.db.get_all_vocab_words(self.onboarding_data, limit=20)
 
         message = f"""
