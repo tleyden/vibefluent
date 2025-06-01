@@ -18,7 +18,7 @@ from constants import DEFAULT_REALTIME_AUDIO_MODEL, MODE, DEFAULT_REALTIME_AUDIO
 
 class RealtimeAudioConversationAgent:
     def __init__(self, onboarding_data: OnboardingData):
-        self.onboarding_data = onboarding_data
+        self.onboarding_data: OnboardingData = onboarding_data
         self.conversation_history: List[str] = []
         self.max_history = 100
         self.db = get_database()
@@ -416,13 +416,13 @@ class RealtimeAudioConversationAgent:
             return (
                 f"Translate the words into {self.onboarding_data.target_language} as requested by user: {llm_response}. "
                 + "Make sure that you mention that you have made a note for future practice. "
-                + "Keep the conversation going in target language: {self.onboarding_data.target_language}"
+                + self._keep_conversation_going()
             )
 
         except Exception as e:
             logfire.error(f"Error processing translation request: {e}")
-            return f"Keep the conversation going in the target language: {self.onboarding_data.target_language}."
-        
+            return self._keep_conversation_going()
+
     async def _user_asked_to_save_vocab_word(self, llm_response: str) -> str:
         try:
             logfire.info(
@@ -436,12 +436,18 @@ class RealtimeAudioConversationAgent:
 
             return (
                 f"Tell the user you saved the word or words in '{llm_response}' for future practice. "
-                + "Keep the conversation going in target language: {self.onboarding_data.target_language}"
+                + self._keep_conversation_going()
             )
 
         except Exception as e:
             logfire.error(f"Error processing save vocab request: {e}")
-            return f"Keep the conversation going in the target language: {self.onboarding_data.target_language}."
+            return self._keep_conversation_going()
+
+    def _keep_conversation_going(self) -> str:
+        return (
+            f"Keep the conversation going in the target language: {self.onboarding_data.target_language}. "
+            + f"Focus on the user's interests: {self.onboarding_data.conversation_interests} and language learning goals: {self.onboarding_data.reason_for_learning}."
+        )
 
     async def _user_used_other_language_mistake(self, mistake_explanation: str) -> str:
         try:
@@ -457,13 +463,13 @@ class RealtimeAudioConversationAgent:
             return (
                 f"Explain the mistake to the user {mistake_explanation} in "
                 + f"their native language {self.onboarding_data.native_language}.  Make sure you mention "
-                + "that you have made a note for future practice, and keep "
-                + f"the conversation going in the target language {self.onboarding_data.target_language}."
+                + "that you have made a note for future practice.  "
+                + self._keep_conversation_going()
             )
 
         except Exception as e:
             logfire.error(f"Error recording mistake: {e}")
-            return f"Keep the conversation going in the target language: {self.onboarding_data.target_language}."
+            return self._keep_conversation_going()
 
     async def _process_websocket_message(self, data):
         """Process different types of messages from the API."""
@@ -601,7 +607,7 @@ class RealtimeAudioConversationAgent:
             vocab_function_calls = [
                 "user_used_other_language_mistake",
                 "user_asked_for_translation",
-                "user_asked_to_save_vocab_word"
+                "user_asked_to_save_vocab_word",
             ]
 
             logfire.info("processing function call", data=data)
@@ -630,7 +636,7 @@ class RealtimeAudioConversationAgent:
                 - Reverse translation: "What's the {self.onboarding_data.native_language} word for [target word]?"
                 - Listening comprehension: "Speak out 3-4 sentences in {self.onboarding_data.native_language}, and ask the user questions to test their comprehension of the sentences, focusing on the vocabulary words in the questions."
 
-                If you sense the user is getting tired or frustrated, or if they have already done many drills, offer to finish the drill session and continue the conversation in a more relaxed manner.
+                After finishing with drills, avoid asking the user what they want to talk about, since they often don't know. Instead, suggest topics based on their interests and previous conversations.
                 """
 
                 logfire.info(
