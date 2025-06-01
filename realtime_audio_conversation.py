@@ -6,7 +6,7 @@ import pyaudio
 import threading
 import queue
 import os
-from typing import List, Optional
+from typing import Optional
 from onboarding import OnboardingData
 from models import VocabExtractResponse
 from database import get_database
@@ -125,9 +125,9 @@ class RealtimeAudioConversationAgent:
         }
 
         # Get the ISO language code for the target language
-        target_lang_code = language_mapping.get(
-            self.onboarding_data.target_language, "en"
-        )
+        # target_lang_code = language_mapping.get(
+        #     self.onboarding_data.target_language, "en"
+        # )
 
         config = {
             "type": "session.update",
@@ -137,10 +137,11 @@ class RealtimeAudioConversationAgent:
                 "voice": DEFAULT_REALTIME_AUDIO_VOICE,
                 "input_audio_format": "pcm16",
                 "output_audio_format": "pcm16",
-                "input_audio_transcription": {
-                    "model": "whisper-1",
-                    "language": target_lang_code,
-                },
+                # We don't need to specify input_audio_transcription for realtime audio, no need for it right now
+                # "input_audio_transcription": {
+                #     "model": "whisper-1",
+                #     "language": target_lang_code,
+                # },
                 "turn_detection": {
                     "type": "server_vad",
                     "threshold": 0.85,
@@ -262,7 +263,7 @@ class RealtimeAudioConversationAgent:
 
         await self.websocket.send(json.dumps(config))
         logfire.info(
-            f"Session configured for realtime audio with {self.onboarding_data.target_language} transcription"
+            "Session configured for realtime audio"
         )
 
     def _start_audio_input_stream(self):
@@ -492,6 +493,11 @@ class RealtimeAudioConversationAgent:
         """Process different types of messages from the API."""
         message_type = data.get("type")
 
+        logfire.trace(
+            f"Received message of type: {message_type}",
+            data=data,
+        )
+
         # Map message types to their handler methods
         handler_map = {
             "response.audio.delta": self._handle_response_audio_delta,
@@ -580,7 +586,6 @@ class RealtimeAudioConversationAgent:
         if transcript:
             logfire.info(f"User transcript: {transcript}")
 
-
     async def _handle_response_cancelled(self, data):
         """Handle response.cancelled messages."""
         # Assistant response was cancelled (due to interruption)
@@ -590,7 +595,6 @@ class RealtimeAudioConversationAgent:
         self.is_assistant_speaking = False
         # Clear any remaining audio in the queue to stop playback immediately
         self._clear_audio_queue()
-
 
     async def _handle_error(self, data):
         """Handle error messages."""
@@ -666,7 +670,9 @@ class RealtimeAudioConversationAgent:
         await self._create_response_keep_conversation_going()
 
     async def _process_user_wants_vocab_drill(self, data):
+
         vocab_words = self.db.get_all_vocab_words(self.onboarding_data)
+
         message = f"""
         The user wants to do vocabulary drills.  Run the user through a vocabulary drill session with the following words:
 
