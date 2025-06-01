@@ -3,8 +3,11 @@ DEFAULT_FALLBACK_MODEL = "gpt-4o"
 DEFAULT_REASONING_MODEL = "o1"
 DUMP_RAW_LLM_OUTPUT = False
 
-# Oher model: gpt-4o-realtime-preview-2024-10-01
-DEFAULT_REALTIME_AUDIO_MODEL = "gpt-4o-mini-realtime-preview-2024-12-17"
+
+# DEFAULT_REALTIME_AUDIO_MODEL = "gpt-4o-mini-realtime-preview-2024-12-17"
+DEFAULT_REALTIME_AUDIO_MODEL = "gpt-4o-realtime-preview-2024-12-17"
+
+DEFAULT_REALTIME_AUDIO_VOICE = "shimmer"
 
 # Mode constants
 # MODE = "TEXT"  # Options: "TEXT" or "REALTIME_AUDIO"

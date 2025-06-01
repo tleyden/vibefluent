@@ -8,12 +8,12 @@ import queue
 import os
 from typing import List, Optional
 from onboarding import OnboardingData
-from models import ConversationResponse
+from models import VocabExtractResponse
 from database import get_database
 from prompt_manager import get_prompt_manager
 import logfire
 from llm_agent_factory import LLMAgentFactory
-from constants import DEFAULT_REALTIME_AUDIO_MODEL, MODE
+from constants import DEFAULT_REALTIME_AUDIO_MODEL, MODE, DEFAULT_REALTIME_AUDIO_VOICE
 
 
 class RealtimeAudioConversationAgent:
@@ -31,7 +31,7 @@ class RealtimeAudioConversationAgent:
         )
         self.vocab_extraction_system_prompt = vocab_extraction_prompt
         self.vocab_extractor = self.factory.create_agent(
-            result_type=ConversationResponse,
+            result_type=VocabExtractResponse,
             system_prompt=vocab_extraction_prompt,
         )
 
@@ -139,7 +139,7 @@ class RealtimeAudioConversationAgent:
             "session": {
                 "modalities": ["text", "audio"],
                 "instructions": self._create_system_message(),
-                "voice": "alloy",
+                "voice": DEFAULT_REALTIME_AUDIO_VOICE,
                 "input_audio_format": "pcm16",
                 "output_audio_format": "pcm16",
                 "input_audio_transcription": {
@@ -150,9 +150,48 @@ class RealtimeAudioConversationAgent:
                     "type": "server_vad",
                     "threshold": 0.85,
                     "prefix_padding_ms": 300,
-                    "silence_duration_ms": 400,
+                    "silence_duration_ms": 1200,
                 },
-                "tools": [],
+                "tools": [
+                    {
+                        "type": "function",
+                        "name": "user_used_other_language_mistake",
+                        "description": f"""
+                        If the user speaks in their native language {self.onboarding_data.native_language}, or any other language, instead of the target language {self.onboarding_data.target_language}, consider it a mistake.
+                        """,
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "mistake_explanation": {
+                                    "type": "string",
+                                    "description": "Brief explanation of the mistake, including the words or phrases that were supposed to be in the target language but were in another language.",
+                                },
+                            },
+                            "required": [
+                                "mistake_explanation",
+                            ],
+                        },
+                    },
+                    {
+                        "type": "function",
+                        "name": "user_asked_for_translation",
+                        "description": f"""
+                        If the user explicitly asks for the translation of a word into {self.onboarding_data.target_language}, this tool will save that word for future drills.
+                        """,
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "words_needing_translation": {
+                                    "type": "string",
+                                    "description": f"The word or words that the user asked to have translated into {self.onboarding_data.target_language}",
+                                },
+                            },
+                            "required": [
+                                "words_needing_translation",
+                            ],
+                        },
+                    },
+                ],
                 "tool_choice": "auto",
                 "temperature": 0.8,
                 "max_response_output_tokens": 4096,
@@ -269,10 +308,6 @@ class RealtimeAudioConversationAgent:
             try:
                 message = await self.websocket.recv()
                 data = json.loads(message)
-                logfire.trace(
-                    "Received WebSocket message",
-                    data=data,
-                )
 
                 await self._process_websocket_message(data)
 
@@ -281,32 +316,11 @@ class RealtimeAudioConversationAgent:
             except Exception as e:
                 logfire.error(f"WebSocket message handling error: {e}.  Retrying...")
 
-    async def _process_user_transcript(
-        self,
-        user_transcripts: List[str],
-        assistant_response: str,
-        conversation_history: List[str],
-    ):
-        """Process user transcripts with assistant response context to detect and save vocabulary words."""
-        if not user_transcripts or not any(t.strip() for t in user_transcripts):
-            return
-
+    async def _extract_vocabulary_from_llm_response(self, llm_response: str):
         try:
-            # Get last 5 messages from conversation history for context
-            recent_history = (
-                conversation_history[-5:]
-                if len(conversation_history) > 5
-                else conversation_history
-            )
-
-            # Combine user transcripts into a single context
-            user_input = " ".join(user_transcripts)
-
-            # Use prompt manager to render the realtime vocab extraction prompt
-            prompt = self.prompt_manager.render_realtime_vocab_extraction_prompt(
-                user_transcripts=user_input,
-                assistant_response=assistant_response,
-                recent_conversation_history=recent_history,
+            # Extract vocabulary words from the mistake explanation
+            prompt = await self.prompt_manager.render_realtime_vocab_extraction_prompt(
+                llm_response=llm_response,
                 onboarding_data=self.onboarding_data,
             )
 
@@ -321,34 +335,70 @@ class RealtimeAudioConversationAgent:
                 onboarding_data=self.onboarding_data,
             )
 
+            # Save to database asynchronously to avoid blocking the event loop
             vocab_response = result.data
-
-            # Save any vocabulary words that were detected
-            if vocab_response.vocab_words_user_asked_about:
-                self.db.save_vocab_words(
-                    vocab_response.vocab_words_user_asked_about,
+            if vocab_response.vocab_words:
+                await self.db.save_vocab_words_async(
+                    vocab_response.vocab_words,
                     self.onboarding_data.native_language,
                     self.onboarding_data.target_language,
                 )
 
                 logfire.info(
-                    f"New vocabulary words saved from audio conversation: {', '.join(str(word) for word in vocab_response.vocab_words_user_asked_about)}",
+                    f"New vocabulary words saved from llm response: {', '.join(str(word) for word in vocab_response.vocab_words)}",
                     onboarding_data=self.onboarding_data,
-                    vocab_words=vocab_response.vocab_words_user_asked_about,
-                    user_transcripts=user_transcripts,
-                    assistant_response=assistant_response,
+                    vocab_words=vocab_response.vocab_words,
+                    mistake_explanation=llm_response,
                 )
                 print(
-                    "\033[1;32mNew vocabulary words saved: "
-                    + ", ".join(
-                        str(word)
-                        for word in vocab_response.vocab_words_user_asked_about
-                    )
+                    "\033[1;32m🫙 New vocabulary words saved: "
+                    + ", ".join(str(word) for word in vocab_response.vocab_words)
                     + "\033[0m"
                 )
 
         except Exception as e:
-            logfire.error(f"Error processing user transcript for vocab: {e}")
+            logfire.exception(
+                f"Error extracting vocab from llm response: {e}",
+                llm_response=llm_response,
+            )
+
+    async def _user_asked_for_translation(self, llm_response: str) -> str:
+        try:
+            logfire.info(
+                f"User asked for translation: {llm_response}",
+                onboarding_data=self.onboarding_data,
+            )
+
+            print(
+                f"\033[1;33m🔧 User asked for translation: '{llm_response}'.  Vocab will be extracted and saved"
+            )
+
+            return f"Translate the words into {self.onboarding_data.target_language} as requested by user: {llm_response}.  Keep the conversation going in target language: {self.onboarding_data.target_language}"
+
+        except Exception as e:
+            logfire.error(f"Error processing translation request: {e}")
+            return f"Keep the conversation going in the target language: {self.onboarding_data.target_language}."
+
+    async def _user_used_other_language_mistake(self, mistake_explanation: str) -> str:
+        try:
+            logfire.info(
+                f"Mistake recorded for {self.onboarding_data.name}: {mistake_explanation}",
+                onboarding_data=self.onboarding_data,
+            )
+
+            print(
+                f"\033[1;33m🔧 Mistake encountered: '{mistake_explanation}'.  Vocab will be extracted and saved"
+            )
+
+            return (
+                f"Explain the mistake to the user {mistake_explanation} in "
+                + f"their native language {self.onboarding_data.native_language}, and keep "
+                + f"the conversation going in the target language {self.onboarding_data.target_language}."
+            )
+
+        except Exception as e:
+            logfire.error(f"Error recording mistake: {e}")
+            return f"Keep the conversation going in the target language: {self.onboarding_data.target_language}."
 
     async def _process_websocket_message(self, data):
         """Process different types of messages from the API."""
@@ -375,17 +425,6 @@ class RealtimeAudioConversationAgent:
             if transcript:
                 self.conversation_history.append(f"Assistant: {transcript}")
                 logfire.info(f"Assistant transcript: {transcript}")
-
-                # Process vocabulary if we have pending user transcripts
-                if self.pending_user_transcripts:
-                    await self._process_user_transcript(
-                        self.pending_user_transcripts,
-                        transcript,
-                        self.conversation_history,
-                    )
-                    # Reset the pending transcripts after processing
-                    self.pending_user_transcripts = []
-
         elif message_type == "response.created":
             # Response generation started
             self.has_active_response = True
@@ -444,6 +483,79 @@ class RealtimeAudioConversationAgent:
             else:
                 logfire.error(f"API error: {error_msg}")
 
+        elif message_type == "response.function_call_arguments.delta":
+            # Function call arguments being streamed
+            pass
+
+        elif message_type == "response.function_call_arguments.done":
+            logfire.info(
+                "Received function call arguments (final output) - processing function call",
+                data=data,
+            )
+            await self.process_function_call(data)
+
+    async def process_function_call(self, data):
+        try:
+            logfire.info("processing function call", data=data)
+            # Function call arguments complete - handle tool calls
+            function_name = data.get("name", "")
+            logfire.info(f"function name: {function_name}")
+
+            if function_name == "user_used_other_language_mistake":
+                arguments = json.loads(data.get("arguments", "{}"))
+                llm_response = arguments.get("mistake_explanation", "")
+                message = await self._user_used_other_language_mistake(llm_response)
+            elif function_name == "user_asked_for_translation":
+                arguments = json.loads(data.get("arguments", "{}"))
+                logfire.info(
+                    "Processing user_asked_for_translation function call",
+                    arguments=arguments,
+                )
+                llm_response = arguments.get("words_needing_translation", "")
+                message = await self._user_asked_for_translation(llm_response)
+
+            logfire.info(
+                f"Sending  function call result: {message}",
+            )
+
+            # Send function call result back to the API
+            result_message = {
+                "type": "conversation.item.create",
+                "item": {
+                    "type": "function_call_output",
+                    "call_id": data.get("call_id"),
+                    "output": json.dumps(
+                        {
+                            "success": True,
+                            "message": message,
+                        }
+                    ),
+                },
+            }
+
+            if not self.websocket or self.websocket.closed:
+                raise RuntimeError(
+                    "WebSocket connection is not open. Cannot send function call result."
+                )
+
+            await self.websocket.send(json.dumps(result_message))
+
+            # Trigger response generation after function call to keep conversation going
+            response_message = {"type": "response.create"}
+            await self.websocket.send(json.dumps(response_message))
+
+            # Schedule vocabulary extraction after a short delay since otherwise this seems
+            # slow down the response generation.  Not sure why
+            async def delayed_extract():
+                await asyncio.sleep(1)
+                await self._extract_vocabulary_from_llm_response(llm_response)
+
+            asyncio.create_task(delayed_extract())
+
+        except Exception as e:
+            logfire.exception(f"Error processing function call: {e}")
+            return
+
     async def start_conversation(self):
         """Start the realtime audio conversation."""
         if not await self._connect_websocket():
@@ -477,24 +589,6 @@ class RealtimeAudioConversationAgent:
             await self.websocket.close()
 
         logfire.info("Realtime audio conversation stopped")
-
-    def add_to_history(self, user_message: str):
-        """Add user message to conversation history, maintaining max limit."""
-        self.conversation_history.append(user_message)
-        if len(self.conversation_history) > self.max_history:
-            self.conversation_history = self.conversation_history[-self.max_history :]
-
-    def get_response(self, user_message: str) -> ConversationResponse:
-        """Get AI response to user message in realtime audio mode."""
-        # For compatibility with text mode interface
-        # In actual realtime mode, this won't be used much
-        self.add_to_history(user_message)
-
-        return ConversationResponse(
-            assistant_message="In realtime audio mode - responses are provided via voice.",
-            follow_up_question="Continue speaking to practice your conversation skills!",
-            vocab_words_user_asked_about=[],
-        )
 
     async def send_text_message(self, message: str):
         """Send a text message to the conversation (useful for commands)."""
