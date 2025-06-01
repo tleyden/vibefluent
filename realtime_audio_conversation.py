@@ -13,7 +13,8 @@ from database import get_database
 from prompt_manager import get_prompt_manager
 import logfire
 from llm_agent_factory import LLMAgentFactory
-from constants import DEFAULT_REALTIME_AUDIO_MODEL
+from constants import DEFAULT_REALTIME_AUDIO_MODEL, MODE
+
 
 class RealtimeAudioConversationAgent:
     def __init__(self, onboarding_data: OnboardingData):
@@ -69,10 +70,6 @@ class RealtimeAudioConversationAgent:
             f"RealtimeAudioConversationAgent initialized for {self.onboarding_data.name}",
             onboarding_data=onboarding_data,
         )
-
-    def generate_initial_question(self) -> str:
-        """Generate a personalized question for realtime audio mode."""
-        return f"Hello {self.onboarding_data.name}! Welcome to realtime audio mode. I'll speak with you to help practice your {self.onboarding_data.target_language}. Start speaking, and I'll respond with audio."
 
     def _create_system_message(self) -> str:
         """Create the system message for the OpenAI Realtime API using template."""
@@ -198,6 +195,8 @@ class RealtimeAudioConversationAgent:
             stream.stop_stream()
             stream.close()
 
+        # Start in its own thread to avoid blocking the main async loop
+        # which needs to send websocket messages, etc
         threading.Thread(target=audio_input_thread, daemon=True).start()
 
     async def _send_audio_chunk(self, audio_data):
@@ -218,7 +217,7 @@ class RealtimeAudioConversationAgent:
             await self.websocket.send(json.dumps(interrupt_message))
             logfire.info("Interrupted assistant response due to user speech")
         else:
-            logfire.trace(
+            logfire.debug(
                 "User started speaking - cleared audio queue (no active response to cancel)"
             )
 
@@ -232,7 +231,7 @@ class RealtimeAudioConversationAgent:
             except queue.Empty:
                 break
         if cleared_count > 0:
-            logfire.trace(f"Cleared {cleared_count} audio chunks from queue")
+            logfire.debug(f"Cleared {cleared_count} audio chunks from queue")
 
     def _start_audio_output_stream(self):
         """Start playing audio from the response queue."""
@@ -260,6 +259,8 @@ class RealtimeAudioConversationAgent:
             stream.stop_stream()
             stream.close()
 
+        # Start in its own thread to avoid blocking the main async loop
+        # which needs to send websocket messages, etc
         threading.Thread(target=audio_output_thread, daemon=True).start()
 
     async def _handle_websocket_messages(self):
@@ -268,14 +269,17 @@ class RealtimeAudioConversationAgent:
             try:
                 message = await self.websocket.recv()
                 data = json.loads(message)
+                logfire.trace(
+                    "Received WebSocket message",
+                    data=data,
+                )
 
                 await self._process_websocket_message(data)
 
-            except websockets.exceptions.ConnectionClosed:
-                logfire.info("WebSocket connection closed")
-                break
+            except websockets.exceptions.ConnectionClosed as e:
+                raise RuntimeError("WebSocket connection closed unexpectedly") from e
             except Exception as e:
-                logfire.error(f"WebSocket message handling error: {e}")
+                logfire.error(f"WebSocket message handling error: {e}.  Retrying...")
 
     async def _process_user_transcript(
         self,
@@ -387,29 +391,29 @@ class RealtimeAudioConversationAgent:
             self.has_active_response = True
             self.response_id = data.get("response", {}).get("id")
             self.is_assistant_speaking = False
-            logfire.trace(f"Response started: {self.response_id}")
+            logfire.debug(f"Response started: {self.response_id}")
 
         elif message_type == "response.done":
             # Response generation completed
             self.has_active_response = False
             self.response_id = None
             self.is_assistant_speaking = False
-            logfire.trace("Response completed")
+            logfire.debug("Response completed")
 
         elif message_type == "response.output_item.done":
             # Audio output item completed
             output_item = data.get("item", {})
             if output_item.get("type") == "message":
                 self.is_assistant_speaking = False
-                logfire.trace("Audio output completed")
+                logfire.debug("Audio output completed")
 
         elif message_type == "input_audio_buffer.speech_started":
-            logfire.trace("User started speaking")
+            logfire.debug("User started speaking")
             # Always interrupt - clear audio immediately and try to cancel if possible
             await self._interrupt_assistant()
 
         elif message_type == "input_audio_buffer.speech_stopped":
-            logfire.trace("User stopped speaking")
+            logfire.debug("User stopped speaking")
 
         elif message_type == "conversation.item.input_audio_transcription.completed":
             # User's speech was transcribed
@@ -436,7 +440,7 @@ class RealtimeAudioConversationAgent:
             error_msg = data.get("error", {}).get("message", "Unknown error")
             # Don't log cancellation errors as errors - they're expected during interruption
             if "Cancellation failed" in error_msg:
-                logfire.trace(f"Cancellation attempt failed (expected): {error_msg}")
+                logfire.debug(f"Cancellation attempt failed (expected): {error_msg}")
             else:
                 logfire.error(f"API error: {error_msg}")
 
@@ -454,8 +458,13 @@ class RealtimeAudioConversationAgent:
         self._start_audio_input_stream()
         self._start_audio_output_stream()
 
-        # Start handling WebSocket messages
+        # Kick off the conversation
+        await self.send_text_message("Greet the user and start the conversation.")
+
+        # Start handling WebSocket messages - this blocks indefinitely
+        logfire.info("Starting to handle WebSocket messages")
         await self._handle_websocket_messages()
+        logfire.info("Finished handling WebSocket messages")
 
         return True
 
@@ -508,3 +517,39 @@ class RealtimeAudioConversationAgent:
         """Cleanup audio resources."""
         if hasattr(self, "audio"):
             self.audio.terminate()
+
+
+def run_realtime_audio_loop(conversation_agent: RealtimeAudioConversationAgent):
+    """Run the realtime audio conversation loop."""
+
+    async def audio_loop():
+        # Start the realtime conversation
+        # Note this will block indefinitely until conversation is stopped, but no way to stop it
+        logfire.info(
+            f"Starting realtime audio conversation for {conversation_agent.onboarding_data.name}"
+        )
+        success = await conversation_agent.start_conversation()
+        logfire.info(
+            f"Finished realtime audio conversation for {conversation_agent.onboarding_data.name}.  Result: {success}"
+        )
+
+        if not success:
+            raise RuntimeError(
+                "Failed to start realtime audio mode. Please check your internet connection and API key."
+            )
+
+    # Run the async audio loop
+    asyncio.run(audio_loop())
+
+
+def run_realtime_conversation_loop(onboarding_data):
+    print("\n" + "=" * 60)
+    print("🌍 Welcome to your conversation practice! 🌍")
+    print(f"Mode: {MODE}")
+    print("Type 'quit' or 'exit' to end the conversation")
+    print("Type 're-onboard' to update your profile settings")
+    print("Press Ctrl+C to exit anytime")
+    print("=" * 60 + "\n")
+
+    conversation_agent = RealtimeAudioConversationAgent(onboarding_data)
+    return run_realtime_audio_loop(conversation_agent)
