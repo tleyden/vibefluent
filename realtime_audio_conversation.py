@@ -13,7 +13,7 @@ from database import get_database
 from prompt_manager import get_prompt_manager
 import logfire
 from llm_agent_factory import LLMAgentFactory
-from constants import DEFAULT_REALTIME_AUDIO_MODEL, MODE
+from constants import DEFAULT_REALTIME_AUDIO_MODEL, MODE, DEFAULT_REALTIME_AUDIO_VOICE
 
 
 class RealtimeAudioConversationAgent:
@@ -139,7 +139,7 @@ class RealtimeAudioConversationAgent:
             "session": {
                 "modalities": ["text", "audio"],
                 "instructions": self._create_system_message(),
-                "voice": "alloy",
+                "voice": DEFAULT_REALTIME_AUDIO_VOICE,
                 "input_audio_format": "pcm16",
                 "output_audio_format": "pcm16",
                 "input_audio_transcription": {
@@ -150,7 +150,7 @@ class RealtimeAudioConversationAgent:
                     "type": "server_vad",
                     "threshold": 0.85,
                     "prefix_padding_ms": 300,
-                    "silence_duration_ms": 400,
+                    "silence_duration_ms": 800,
                 },
                 "tools": [
                     {

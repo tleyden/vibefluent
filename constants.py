@@ -7,6 +7,7 @@ DUMP_RAW_LLM_OUTPUT = False
 # DEFAULT_REALTIME_AUDIO_MODEL = "gpt-4o-mini-realtime-preview-2024-12-17"
 DEFAULT_REALTIME_AUDIO_MODEL = "gpt-4o-realtime-preview-2024-12-17"
 
+DEFAULT_REALTIME_AUDIO_VOICE = "shimmer"
 
 # Mode constants
 # MODE = "TEXT"  # Options: "TEXT" or "REALTIME_AUDIO"
