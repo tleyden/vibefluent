@@ -165,40 +165,20 @@ class RealtimeAudioConversationAgent:
                     },
                     {
                         "type": "function",
-                        "name": "record_mistake",
-                        "description": "Record a language mistake made by the user during conversation",
+                        "name": "user_used_native_language_mistake",
+                        "description": f"""
+                        If the user uses the native language {self.onboarding_data.native_language} instead of the target language {self.onboarding_data.target_language}, consider it a mistake.
+                        """,
                         "parameters": {
                             "type": "object",
                             "properties": {
-                                "mistake_text": {
+                                "mistake_explanation": {
                                     "type": "string",
-                                    "description": "The incorrect text or phrase the user said",
-                                },
-                                "correct_text": {
-                                    "type": "string",
-                                    "description": "The correct way to say it in the target language",
-                                },
-                                "mistake_type": {
-                                    "type": "string",
-                                    "enum": [
-                                        "grammar",
-                                        "pronunciation",
-                                        "vocabulary",
-                                        "word_order",
-                                        "conjugation",
-                                    ],
-                                    "description": "The type of mistake made",
-                                },
-                                "explanation": {
-                                    "type": "string",
-                                    "description": "Brief explanation of why it's incorrect and how to fix it",
+                                    "description": "Breif explanation of the mistake",
                                 },
                             },
                             "required": [
-                                "mistake_text",
-                                "correct_text",
-                                "mistake_type",
-                                "explanation",
+                                "mistake_explanation",
                             ],
                         },
                     },
@@ -400,7 +380,7 @@ class RealtimeAudioConversationAgent:
     #     except Exception as e:
     #         logfire.error(f"Error processing user transcript for vocab: {e}")
 
-    async def _record_mistake(self, mistake_data: dict):
+    async def _user_used_native_language_mistake(self, mistake_data: dict):
         """Record a language mistake made by the user."""
         try:
             # Save mistake to database
@@ -415,13 +395,13 @@ class RealtimeAudioConversationAgent:
             # )
 
             logfire.info(
-                f"Mistake recorded for {self.onboarding_data.name}: {mistake_data['mistake_text']} → {mistake_data['correct_text']}",
+                f"Mistake recorded for {self.onboarding_data.name}: {mistake_data['mistake_explanation']}",
                 mistake_data=mistake_data,
                 onboarding_data=self.onboarding_data,
             )
 
             print(
-                f"\033[1;33m🔧 Mistake recorded: '{mistake_data['mistake_text']}' → '{mistake_data['correct_text']}'\033[0m"
+                f"\033[1;33m🔧 Mistake recorded: '{mistake_data['mistake_explanation']}'"
             )
 
         except Exception as e:
@@ -523,10 +503,6 @@ class RealtimeAudioConversationAgent:
 
         elif message_type == "response.function_call_arguments.delta":
             # Function call arguments being streamed
-            logfire.info(
-                "Received function call arguments delta - this is a stream, not final output",
-                data=data,
-            )
             pass
 
         elif message_type == "response.function_call_arguments.done":
@@ -543,9 +519,9 @@ class RealtimeAudioConversationAgent:
             function_name = data.get("name", "")
             logfire.info(f"function name: {function_name}")
 
-            if function_name == "record_mistake":
+            if function_name == "user_used_native_language_mistake":
                 arguments = json.loads(data.get("arguments", "{}"))
-                await self._record_mistake(arguments)
+                await self._user_used_native_language_mistake(arguments)
 
                 # Send function call result back to the API
                 result_message = {
