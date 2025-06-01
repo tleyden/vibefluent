@@ -78,7 +78,7 @@ class RealtimeAudioConversationAgent:
         if vocab_words:
             vocab_list = [
                 f"{w.word_in_target_language} ({w.word_in_native_language})"
-                for w in vocab_words[:20]
+                for w in vocab_words
             ]
             vocab_context = f"\nVocabulary words to practice: {', '.join(vocab_list)}"
 
@@ -157,14 +157,19 @@ class RealtimeAudioConversationAgent:
                         "type": "function",
                         "name": "user_used_other_language_mistake",
                         "description": f"""
-                        If the user speaks in their native language {self.onboarding_data.native_language}, or any other language, instead of the target language {self.onboarding_data.target_language}, consider it a mistake.
+                        If the user speaks in their native language {self.onboarding_data.native_language}, 
+                        or any other language, instead of the target language {self.onboarding_data.target_language}, 
+                        consider it a mistake.
                         """,
                         "parameters": {
                             "type": "object",
                             "properties": {
                                 "mistake_explanation": {
                                     "type": "string",
-                                    "description": "Brief explanation of the mistake, including the words or phrases that were supposed to be in the target language but were in another language.",
+                                    "description": """
+                                        Brief explanation of the mistake, including the words or phrases that 
+                                        were supposed to be in the target language but were in another language.
+                                    """,
                                 },
                             },
                             "required": [
@@ -176,7 +181,9 @@ class RealtimeAudioConversationAgent:
                         "type": "function",
                         "name": "user_asked_for_translation",
                         "description": f"""
-                        If the user explicitly asks for the translation of a word into {self.onboarding_data.target_language}, this tool will save that word for future drills.
+                            If the user explicitly asks for the translation of a word 
+                            into {self.onboarding_data.target_language}, this tool will save 
+                            that word for future drills.
                         """,
                         "parameters": {
                             "type": "object",
