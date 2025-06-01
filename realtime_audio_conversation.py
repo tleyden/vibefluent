@@ -157,18 +157,18 @@ class RealtimeAudioConversationAgent:
                         "type": "function",
                         "name": "user_used_other_language_mistake",
                         "description": f"""
-                        If the user speaks in their native language {self.onboarding_data.native_language}, 
-                        or any other language, instead of the target language {self.onboarding_data.target_language}, 
-                        consider it a mistake.
+                        This function will be called when the user responds with any words in their native language {self.onboarding_data.native_language}, 
+                        or any other language rather than the target language {self.onboarding_data.target_language}
                         """,
                         "parameters": {
                             "type": "object",
                             "properties": {
                                 "mistake_explanation": {
                                     "type": "string",
-                                    "description": """
+                                    "description": f"""
                                         Brief explanation of the mistake, including the words or phrases that 
-                                        were supposed to be in the target language but were in another language.
+                                        were supposed to be in the target language {self.onboarding_data.target_language} 
+                                        but were in a different language.
                                     """,
                                 },
                             },
@@ -411,95 +411,132 @@ class RealtimeAudioConversationAgent:
         """Process different types of messages from the API."""
         message_type = data.get("type")
 
-        if message_type == "response.audio.delta":
-            # Received audio chunk - only queue if we're not being interrupted
-            audio_b64 = data.get("delta")
-            if audio_b64:
-                audio_data = base64.b64decode(audio_b64)
-                self.audio_queue.put(audio_data)
-                self.is_assistant_speaking = True
+        # Map message types to their handler methods
+        handler_map = {
+            "response.audio.delta": self._handle_response_audio_delta,
+            "response.audio_transcript.delta": self._handle_response_audio_transcript_delta,
+            "response.audio_transcript.done": self._handle_response_audio_transcript_done,
+            "response.created": self._handle_response_created,
+            "response.done": self._handle_response_done,
+            "response.output_item.done": self._handle_response_output_item_done,
+            "input_audio_buffer.speech_started": self._handle_input_audio_buffer_speech_started,
+            "input_audio_buffer.speech_stopped": self._handle_input_audio_buffer_speech_stopped,
+            "conversation.item.input_audio_transcription.completed": self._handle_conversation_item_input_audio_transcription_completed,
+            "response.cancelled": self._handle_response_cancelled,
+            "error": self._handle_error,
+            "response.function_call_arguments.delta": self._handle_response_function_call_arguments_delta,
+            "response.function_call_arguments.done": self._handle_response_function_call_arguments_done,
+        }
 
-        elif message_type == "response.audio_transcript.delta":
-            # Received transcript chunk
-            transcript = data.get("delta", "")
-            if transcript:
-                # Store partial transcript (could display this in real-time)
-                pass
+        handler = handler_map.get(message_type)
+        if handler:
+            await handler(data)
+        else:
+            logfire.debug(f"Unhandled message type: {message_type}")
 
-        elif message_type == "response.audio_transcript.done":
-            # Complete assistant transcript received
-            transcript = data.get("transcript", "")
-            if transcript:
-                self.conversation_history.append(f"Assistant: {transcript}")
-                logfire.info(f"Assistant transcript: {transcript}")
-        elif message_type == "response.created":
-            # Response generation started
-            self.has_active_response = True
-            self.response_id = data.get("response", {}).get("id")
-            self.is_assistant_speaking = False
-            logfire.debug(f"Response started: {self.response_id}")
+    async def _handle_response_audio_delta(self, data):
+        """Handle response.audio.delta messages."""
+        # Received audio chunk - only queue if we're not being interrupted
+        audio_b64 = data.get("delta")
+        if audio_b64:
+            audio_data = base64.b64decode(audio_b64)
+            self.audio_queue.put(audio_data)
+            self.is_assistant_speaking = True
 
-        elif message_type == "response.done":
-            # Response generation completed
-            self.has_active_response = False
-            self.response_id = None
-            self.is_assistant_speaking = False
-            logfire.debug("Response completed")
-
-        elif message_type == "response.output_item.done":
-            # Audio output item completed
-            output_item = data.get("item", {})
-            if output_item.get("type") == "message":
-                self.is_assistant_speaking = False
-                logfire.debug("Audio output completed")
-
-        elif message_type == "input_audio_buffer.speech_started":
-            logfire.debug("User started speaking")
-            # Always interrupt - clear audio immediately and try to cancel if possible
-            await self._interrupt_assistant()
-
-        elif message_type == "input_audio_buffer.speech_stopped":
-            logfire.debug("User stopped speaking")
-
-        elif message_type == "conversation.item.input_audio_transcription.completed":
-            # User's speech was transcribed
-            transcript = data.get("transcript", "")
-            if transcript:
-                self.conversation_history.append(f"User: {transcript}")
-                logfire.info(f"User transcript: {transcript}")
-
-                # Add transcript to pending list for processing after assistant responds
-                self.pending_user_transcripts.append(transcript)
-
-        elif message_type == "response.cancelled":
-            # Assistant response was cancelled (due to interruption)
-            logfire.info("Assistant response was cancelled")
-            self.has_active_response = False
-            self.response_id = None
-            self.is_assistant_speaking = False
-            # Clear any remaining audio in the queue to stop playback immediately
-            self._clear_audio_queue()
-            # Clear pending transcripts since response was cancelled
-            self.pending_user_transcripts = []
-
-        elif message_type == "error":
-            error_msg = data.get("error", {}).get("message", "Unknown error")
-            # Don't log cancellation errors as errors - they're expected during interruption
-            if "Cancellation failed" in error_msg:
-                logfire.debug(f"Cancellation attempt failed (expected): {error_msg}")
-            else:
-                logfire.error(f"API error: {error_msg}")
-
-        elif message_type == "response.function_call_arguments.delta":
-            # Function call arguments being streamed
+    async def _handle_response_audio_transcript_delta(self, data):
+        """Handle response.audio_transcript.delta messages."""
+        # Received transcript chunk
+        transcript = data.get("delta", "")
+        if transcript:
+            # Store partial transcript (could display this in real-time)
             pass
 
-        elif message_type == "response.function_call_arguments.done":
-            logfire.info(
-                "Received function call arguments (final output) - processing function call",
-                data=data,
-            )
-            await self.process_function_call(data)
+    async def _handle_response_audio_transcript_done(self, data):
+        """Handle response.audio_transcript.done messages."""
+        # Complete assistant transcript received
+        transcript = data.get("transcript", "")
+        if transcript:
+            self.conversation_history.append(f"Assistant: {transcript}")
+            logfire.info(f"Assistant transcript: {transcript}")
+
+    async def _handle_response_created(self, data):
+        """Handle response.created messages."""
+        # Response generation started
+        self.has_active_response = True
+        self.response_id = data.get("response", {}).get("id")
+        self.is_assistant_speaking = False
+        logfire.debug(f"Response started: {self.response_id}")
+
+    async def _handle_response_done(self, data):
+        """Handle response.done messages."""
+        # Response generation completed
+        self.has_active_response = False
+        self.response_id = None
+        self.is_assistant_speaking = False
+        logfire.debug("Response completed")
+
+    async def _handle_response_output_item_done(self, data):
+        """Handle response.output_item.done messages."""
+        # Audio output item completed
+        output_item = data.get("item", {})
+        if output_item.get("type") == "message":
+            self.is_assistant_speaking = False
+            logfire.debug("Audio output completed")
+
+    async def _handle_input_audio_buffer_speech_started(self, data):
+        """Handle input_audio_buffer.speech_started messages."""
+        logfire.debug("User started speaking")
+        # Always interrupt - clear audio immediately and try to cancel if possible
+        await self._interrupt_assistant()
+
+    async def _handle_input_audio_buffer_speech_stopped(self, data):
+        """Handle input_audio_buffer.speech_stopped messages."""
+        logfire.debug("User stopped speaking")
+
+    async def _handle_conversation_item_input_audio_transcription_completed(self, data):
+        """Handle conversation.item.input_audio_transcription.completed messages."""
+        # User's speech was transcribed
+        transcript = data.get("transcript", "")
+        if transcript:
+            self.conversation_history.append(f"User: {transcript}")
+            logfire.info(f"User transcript: {transcript}")
+
+            # Add transcript to pending list for processing after assistant responds
+            self.pending_user_transcripts.append(transcript)
+
+    async def _handle_response_cancelled(self, data):
+        """Handle response.cancelled messages."""
+        # Assistant response was cancelled (due to interruption)
+        logfire.info("Assistant response was cancelled")
+        self.has_active_response = False
+        self.response_id = None
+        self.is_assistant_speaking = False
+        # Clear any remaining audio in the queue to stop playback immediately
+        self._clear_audio_queue()
+        # Clear pending transcripts since response was cancelled
+        self.pending_user_transcripts = []
+
+    async def _handle_error(self, data):
+        """Handle error messages."""
+        error_msg = data.get("error", {}).get("message", "Unknown error")
+        # Don't log cancellation errors as errors - they're expected during interruption
+        if "Cancellation failed" in error_msg:
+            logfire.debug(f"Cancellation attempt failed (expected): {error_msg}")
+        else:
+            logfire.error(f"API error: {error_msg}")
+
+    async def _handle_response_function_call_arguments_delta(self, data):
+        """Handle response.function_call_arguments.delta messages."""
+        # Function call arguments being streamed
+        pass
+
+    async def _handle_response_function_call_arguments_done(self, data):
+        """Handle response.function_call_arguments.done messages."""
+        logfire.info(
+            "Received function call arguments (final output) - processing function call",
+            data=data,
+        )
+        await self.process_function_call(data)
 
     async def process_function_call(self, data):
         try:
@@ -621,7 +658,8 @@ class RealtimeAudioConversationAgent:
 
 
 class RealtimeAudioDrillAgent(RealtimeAudioConversationAgent):
-    pass 
+    pass
+
 
 def run_realtime_audio_loop(conversation_agent: RealtimeAudioConversationAgent):
     """Run the realtime audio conversation loop."""

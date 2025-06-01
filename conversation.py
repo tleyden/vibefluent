@@ -1,5 +1,5 @@
 from typing import List
-from constants import MODE, REALTIME_AUDIO_CONVERSATION
+from constants import MODE
 from drill import VocabDrillAgent
 from llm_agent_factory import LLMAgentFactory
 from onboarding import OnboardingData
@@ -8,7 +8,6 @@ from database import get_database
 from prompt_manager import get_prompt_manager
 import logfire
 import sys
-from realtime_audio_conversation import RealtimeAudioConversationAgent
 import readline
 
 
@@ -184,12 +183,7 @@ def run_text_conversation_loop(onboarding_data):
                 )
 
                 # Reinitialize agents with new data
-                if MODE == REALTIME_AUDIO_CONVERSATION:
-                    conversation_agent = RealtimeAudioConversationAgent(
-                        new_onboarding_data
-                    )
-                else:  # Default to TEXT mode
-                    conversation_agent = ConversationAgent(new_onboarding_data)
+                conversation_agent = ConversationAgent(new_onboarding_data)
                 drill_agent = VocabDrillAgent(new_onboarding_data)
                 onboarding_data = new_onboarding_data
 

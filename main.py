@@ -1,7 +1,7 @@
 from onboarding import load_onboarding_data, run_onboarding
 from conversation import run_text_conversation_loop
 from realtime_audio_conversation import run_realtime_conversation_loop, run_realtime_drill_loop
-from constants import MODE, REALTIME_AUDIO_CONVERSATION, REALTIME_AUDIO_DRILL
+from constants import MODE, REALTIME_AUDIO_CONVERSATION, REALTIME_AUDIO_DRILL, TEXT
 from dotenv import load_dotenv
 import logfire
 import os
@@ -26,21 +26,22 @@ def main():
     if LOGFIRE_API_KEY:
         service_name = "vibefluent"
         environment = "development"
-        if MODE == "REALTIME_AUDIO":
-            logfire.configure(
-                token=LOGFIRE_API_KEY,
-                service_name=service_name,
-                environment=environment,
-                # console=False,
-            )
-        else:
+        if MODE == TEXT:
             logfire.configure(
                 token=LOGFIRE_API_KEY,
                 service_name=service_name,
                 environment=environment,
                 console=False,
             )
-            logfire.info("VibeFluent application started successfully")
+        else:
+            logfire.configure(
+                token=LOGFIRE_API_KEY,
+                service_name=service_name,
+                environment=environment,
+                # console=False,
+            )
+            
+        logfire.info("VibeFluent application started successfully")
 
     # Check if user has completed onboarding
     onboarding_data = load_onboarding_data()
