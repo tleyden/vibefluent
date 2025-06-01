@@ -620,6 +620,9 @@ class RealtimeAudioConversationAgent:
             self.audio.terminate()
 
 
+class RealtimeAudioDrillAgent(RealtimeAudioConversationAgent):
+    pass 
+
 def run_realtime_audio_loop(conversation_agent: RealtimeAudioConversationAgent):
     """Run the realtime audio conversation loop."""
 
@@ -654,3 +657,16 @@ def run_realtime_conversation_loop(onboarding_data):
 
     conversation_agent = RealtimeAudioConversationAgent(onboarding_data)
     return run_realtime_audio_loop(conversation_agent)
+
+
+def run_realtime_drill_loop(onboarding_data):
+    print("\n" + "=" * 60)
+    print("🔧 Welcome to your vocabulary drill! 🔧")
+    print(f"Mode: {MODE}")
+    print("Type 'quit' or 'exit' to end the drill")
+    print("Type 're-onboard' to update your profile settings")
+    print("Press Ctrl+C to exit anytime")
+    print("=" * 60 + "\n")
+
+    drill_agent = RealtimeAudioDrillAgent(onboarding_data)
+    return run_realtime_audio_loop(drill_agent)
