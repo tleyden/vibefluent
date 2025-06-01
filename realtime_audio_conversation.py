@@ -197,6 +197,20 @@ class RealtimeAudioConversationAgent:
                             ],
                         },
                     },
+                    {
+                        "type": "function",
+                        "name": "user_wants_vocab_drill",
+                        "description": """
+                            If the user explicitly asks to do vocabulary drills or practice  
+                            this tool will start the vocuabulary drill mode with the user's 
+                            vocabulary words.
+                        """,
+                        "parameters": {
+                            "type": "object",
+                            "properties": {},
+                            "required": [],
+                        },
+                    },
                 ],
                 "tool_choice": "auto",
                 "temperature": 0.8,
@@ -544,65 +558,129 @@ class RealtimeAudioConversationAgent:
 
     async def process_function_call(self, data):
         try:
+            vocab_function_calls = [
+                "user_used_other_language_mistake",
+                "user_asked_for_translation",
+            ]
+
             logfire.info("processing function call", data=data)
             # Function call arguments complete - handle tool calls
             function_name = data.get("name", "")
             logfire.info(f"function name: {function_name}")
 
-            if function_name == "user_used_other_language_mistake":
-                arguments = json.loads(data.get("arguments", "{}"))
-                llm_response = arguments.get("mistake_explanation", "")
-                message = await self._user_used_other_language_mistake(llm_response)
-            elif function_name == "user_asked_for_translation":
-                arguments = json.loads(data.get("arguments", "{}"))
+            if function_name in vocab_function_calls:
+                # Process vocabulary-related function calls
+                await self.process_vocab_function_call(function_name, data)
+            elif function_name == "user_wants_vocab_drill":
+                vocab_words = self.db.get_all_vocab_words(self.onboarding_data)
+                message = f"""
+                The user wants to do vocabulary drills.  Run the user through a vocabulary drill session with the following words:
+
+                {vocab_words}
+
+                Before moving onto the next word, try to make sure the user has passed the drill.  However, give up after 3 or 4 attempts
+                if it's too difficult for the user.  If the user is struggling, try to give them a hint or explain the word in their native language.
+
+                Here are some ideas for drill formats you can use, but feel free to come up with your own:
+
+                - Translation drills: "How do you say [native word] in {self.onboarding_data.target_language}?"
+                - Definition drills: "What does [target word] mean in {self.onboarding_data.native_language}?"
+                - Context drills: "Use the word [target word] in a sentence"
+                - Reverse translation: "What's the {self.onboarding_data.native_language} word for [target word]?"
+                - Listening comprehension: "Speak out 3-4 sentences in {self.onboarding_data.native_language}, and ask the user questions to test their comprehension of the sentences, focusing on the vocabulary words in the questions."
+
+                If you sense the user is getting tired or frustrated, or if they have already done many drills, offer to finish the drill session and continue the conversation in a more relaxed manner.
+                """
+
                 logfire.info(
-                    "Processing user_asked_for_translation function call",
-                    arguments=arguments,
-                )
-                llm_response = arguments.get("words_needing_translation", "")
-                message = await self._user_asked_for_translation(llm_response)
-
-            logfire.info(
-                f"Sending  function call result: {message}",
-            )
-
-            # Send function call result back to the API
-            result_message = {
-                "type": "conversation.item.create",
-                "item": {
-                    "type": "function_call_output",
-                    "call_id": data.get("call_id"),
-                    "output": json.dumps(
-                        {
-                            "success": True,
-                            "message": message,
-                        }
-                    ),
-                },
-            }
-
-            if not self.websocket or self.websocket.closed:
-                raise RuntimeError(
-                    "WebSocket connection is not open. Cannot send function call result."
+                    "Sending function call result for user_wants_vocab_drill",
+                    message=message,
                 )
 
-            await self.websocket.send(json.dumps(result_message))
+                # Send function call result back to the API
+                result_message = {
+                    "type": "conversation.item.create",
+                    "item": {
+                        "type": "function_call_output",
+                        "call_id": data.get("call_id"),
+                        "output": json.dumps(
+                            {
+                                "success": True,
+                                "message": message,
+                            }
+                        ),
+                    },
+                }
 
-            # Trigger response generation after function call to keep conversation going
-            response_message = {"type": "response.create"}
-            await self.websocket.send(json.dumps(response_message))
+                if not self.websocket or self.websocket.closed:
+                    raise RuntimeError(
+                        "WebSocket connection is not open. Cannot send function call result."
+                    )
 
-            # Schedule vocabulary extraction after a short delay since otherwise this seems
-            # slow down the response generation.  Not sure why
-            async def delayed_extract():
-                await asyncio.sleep(1)
-                await self._extract_vocabulary_from_llm_response(llm_response)
+                await self.websocket.send(json.dumps(result_message))
 
-            asyncio.create_task(delayed_extract())
+                # Trigger response generation after function call to keep conversation going
+                response_message = {"type": "response.create"}
+                await self.websocket.send(json.dumps(response_message))
+
+            else:
+                raise RuntimeError(f"Unsupported function call: {function_name}. ")
 
         except Exception as e:
             logfire.exception(f"Error processing function call: {e}")
             return
+
+    async def process_vocab_function_call(self, function_name: str, data):
+        if function_name == "user_used_other_language_mistake":
+            arguments = json.loads(data.get("arguments", "{}"))
+            llm_response = arguments.get("mistake_explanation", "")
+            message = await self._user_used_other_language_mistake(llm_response)
+        elif function_name == "user_asked_for_translation":
+            arguments = json.loads(data.get("arguments", "{}"))
+            logfire.info(
+                "Processing user_asked_for_translation function call",
+                arguments=arguments,
+            )
+            llm_response = arguments.get("words_needing_translation", "")
+            message = await self._user_asked_for_translation(llm_response)
+
+        logfire.info(
+            f"Sending  function call result: {message}",
+        )
+
+        # Send function call result back to the API
+        result_message = {
+            "type": "conversation.item.create",
+            "item": {
+                "type": "function_call_output",
+                "call_id": data.get("call_id"),
+                "output": json.dumps(
+                    {
+                        "success": True,
+                        "message": message,
+                    }
+                ),
+            },
+        }
+
+        if not self.websocket or self.websocket.closed:
+            raise RuntimeError(
+                "WebSocket connection is not open. Cannot send function call result."
+            )
+
+        await self.websocket.send(json.dumps(result_message))
+
+        # Trigger response generation after function call to keep conversation going
+        response_message = {"type": "response.create"}
+        await self.websocket.send(json.dumps(response_message))
+
+        # Schedule vocabulary extraction after a short delay since otherwise this seems
+        # slow down the response generation.  Not sure why
+        async def delayed_extract():
+            await asyncio.sleep(1)
+            await self._extract_vocabulary_from_llm_response(llm_response)
+
+        asyncio.create_task(delayed_extract())
 
     async def _connect_websocket_start_audio_streams(self):
         if not await self._connect_websocket():
@@ -665,27 +743,6 @@ class RealtimeAudioConversationAgent:
             self.audio.terminate()
 
 
-class RealtimeAudioDrillAgent(RealtimeAudioConversationAgent):
-    async def start_conversation(self):
-        """Start the realtime audio conversation."""
-
-        await self._connect_websocket_start_audio_streams()
-
-        # Kick off the conversation
-        await self.send_text_message(
-            "We want to user to practice a vocabulary drill.  Give the user the following drill: How do you say 'I am' in spanish? and expect a valid response until they get it right."
-        )
-
-        # Start handling WebSocket messages - this blocks indefinitely
-        logfire.info("Starting to handle WebSocket messages")
-        await self._handle_websocket_messages()
-        logfire.info("Finished handling WebSocket messages")
-
-        return True
-
-    pass
-
-
 def run_realtime_audio_loop(conversation_agent: RealtimeAudioConversationAgent):
     """Run the realtime audio conversation loop."""
 
@@ -720,25 +777,3 @@ def run_realtime_conversation_loop(onboarding_data):
 
     conversation_agent = RealtimeAudioConversationAgent(onboarding_data)
     return run_realtime_audio_loop(conversation_agent)
-
-
-def run_realtime_drill_loop(onboarding_data):
-    """
-    How the drill mode works:
-
-    1. Generate a drill question
-    2. Call send_text_message to send the question to the agent
-    3. Wait for what exactly?  There could be back and forth conversation about the drill?
-
-
-    """
-    print("\n" + "=" * 60)
-    print("🔧 Welcome to your vocabulary drill! 🔧")
-    print(f"Mode: {MODE}")
-    print("Type 'quit' or 'exit' to end the drill")
-    print("Type 're-onboard' to update your profile settings")
-    print("Press Ctrl+C to exit anytime")
-    print("=" * 60 + "\n")
-
-    drill_agent = RealtimeAudioDrillAgent(onboarding_data)
-    return run_realtime_audio_loop(drill_agent)
