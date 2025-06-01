@@ -1,7 +1,7 @@
 from onboarding import load_onboarding_data, run_onboarding
 from conversation import run_text_conversation_loop
 from realtime_audio_conversation import run_realtime_conversation_loop
-from constants import MODE
+from constants import MODE, REALTIME_AUDIO_CONVERSATION
 from dotenv import load_dotenv
 import logfire
 import os
@@ -56,7 +56,7 @@ def main():
 
     # Start the conversation loop
     # Initialize agents and database based on mode
-    if MODE == "REALTIME_AUDIO":
+    if MODE == REALTIME_AUDIO_CONVERSATION:
         run_realtime_conversation_loop(onboarding_data)
     else:  # Default to TEXT mode
         run_text_conversation_loop(onboarding_data)
