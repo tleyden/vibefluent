@@ -7,7 +7,7 @@ DUMP_RAW_LLM_OUTPUT = False
 DEFAULT_REALTIME_AUDIO_MODEL = "gpt-4o-mini-realtime-preview-2024-12-17"
 
 # Mode constants
-# MODE = "TEXT"  # Options: "TEXT" or "REALTIME_AUDIO"
+MODE = "TEXT"  # Options: "TEXT" or "REALTIME_AUDIO"
 
 # To enable realtime audio mode, change MODE to:
-MODE = "REALTIME_AUDIO"
+# MODE = "REALTIME_AUDIO"

@@ -13,7 +13,8 @@ from database import get_database
 from prompt_manager import get_prompt_manager
 import logfire
 from llm_agent_factory import LLMAgentFactory
-from constants import DEFAULT_REALTIME_AUDIO_MODEL
+from constants import DEFAULT_REALTIME_AUDIO_MODEL, MODE
+
 
 class RealtimeAudioConversationAgent:
     def __init__(self, onboarding_data: OnboardingData):
@@ -508,3 +509,34 @@ class RealtimeAudioConversationAgent:
         """Cleanup audio resources."""
         if hasattr(self, "audio"):
             self.audio.terminate()
+
+
+def run_realtime_audio_loop(conversation_agent, onboarding_data):
+    """Run the realtime audio conversation loop."""
+
+    async def audio_loop():
+        print(f"VibeFluent: {conversation_agent.generate_initial_question()}\n")
+
+        # Start the realtime conversation
+        success = await conversation_agent.start_conversation()
+        if not success:
+            print(
+                "Failed to start realtime audio mode. Please check your internet connection and API key."
+            )
+            return
+
+    # Run the async audio loop
+    asyncio.run(audio_loop())
+
+
+def run_realtime_conversation_loop(onboarding_data):
+    print("\n" + "=" * 60)
+    print("🌍 Welcome to your conversation practice! 🌍")
+    print(f"Mode: {MODE}")
+    print("Type 'quit' or 'exit' to end the conversation")
+    print("Type 're-onboard' to update your profile settings")
+    print("Press Ctrl+C to exit anytime")
+    print("=" * 60 + "\n")
+
+    conversation_agent = RealtimeAudioConversationAgent(onboarding_data)
+    return run_realtime_audio_loop(conversation_agent, onboarding_data)
