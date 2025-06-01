@@ -78,7 +78,7 @@ class RealtimeAudioConversationAgent:
         if vocab_words:
             vocab_list = [
                 f"{w.word_in_target_language} ({w.word_in_native_language})"
-                for w in vocab_words[:20]
+                for w in vocab_words
             ]
             vocab_context = f"\nVocabulary words to practice: {', '.join(vocab_list)}"
 
@@ -157,14 +157,19 @@ class RealtimeAudioConversationAgent:
                         "type": "function",
                         "name": "user_used_other_language_mistake",
                         "description": f"""
-                        If the user speaks in their native language {self.onboarding_data.native_language}, or any other language, instead of the target language {self.onboarding_data.target_language}, consider it a mistake.
+                        If the user speaks in their native language {self.onboarding_data.native_language}, 
+                        or any other language, instead of the target language {self.onboarding_data.target_language}, 
+                        consider it a mistake.
                         """,
                         "parameters": {
                             "type": "object",
                             "properties": {
                                 "mistake_explanation": {
                                     "type": "string",
-                                    "description": "Brief explanation of the mistake, including the words or phrases that were supposed to be in the target language but were in another language.",
+                                    "description": """
+                                        Brief explanation of the mistake, including the words or phrases that 
+                                        were supposed to be in the target language but were in another language.
+                                    """,
                                 },
                             },
                             "required": [
@@ -176,7 +181,9 @@ class RealtimeAudioConversationAgent:
                         "type": "function",
                         "name": "user_asked_for_translation",
                         "description": f"""
-                        If the user explicitly asks for the translation of a word into {self.onboarding_data.target_language}, this tool will save that word for future drills.
+                            If the user explicitly asks for the translation of a word 
+                            into {self.onboarding_data.target_language}, this tool will save 
+                            that word for future drills.
                         """,
                         "parameters": {
                             "type": "object",
@@ -613,6 +620,9 @@ class RealtimeAudioConversationAgent:
             self.audio.terminate()
 
 
+class RealtimeAudioDrillAgent(RealtimeAudioConversationAgent):
+    pass 
+
 def run_realtime_audio_loop(conversation_agent: RealtimeAudioConversationAgent):
     """Run the realtime audio conversation loop."""
 
@@ -647,3 +657,16 @@ def run_realtime_conversation_loop(onboarding_data):
 
     conversation_agent = RealtimeAudioConversationAgent(onboarding_data)
     return run_realtime_audio_loop(conversation_agent)
+
+
+def run_realtime_drill_loop(onboarding_data):
+    print("\n" + "=" * 60)
+    print("🔧 Welcome to your vocabulary drill! 🔧")
+    print(f"Mode: {MODE}")
+    print("Type 'quit' or 'exit' to end the drill")
+    print("Type 're-onboard' to update your profile settings")
+    print("Press Ctrl+C to exit anytime")
+    print("=" * 60 + "\n")
+
+    drill_agent = RealtimeAudioDrillAgent(onboarding_data)
+    return run_realtime_audio_loop(drill_agent)
