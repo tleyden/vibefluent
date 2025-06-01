@@ -380,7 +380,7 @@ class RealtimeAudioConversationAgent:
     #     except Exception as e:
     #         logfire.error(f"Error processing user transcript for vocab: {e}")
 
-    async def _user_used_native_language_mistake(self, mistake_data: dict):
+    async def _user_used_native_language_mistake(self, mistake_data: dict) -> str:
         """Record a language mistake made by the user."""
         try:
             # Save mistake to database
@@ -404,8 +404,15 @@ class RealtimeAudioConversationAgent:
                 f"\033[1;33m🔧 Mistake recorded: '{mistake_data['mistake_explanation']}'"
             )
 
+            return (
+                f"Explain the mistake to the user {mistake_data['mistake_explanation']} in "
+                + f"their native language {self.onboarding_data.native_language}, and keep "
+                + f"the conversation going in the target language {self.onboarding_data.target_language}."
+            )
+
         except Exception as e:
             logfire.error(f"Error recording mistake: {e}")
+            return f"Keep the conversation going in the target language: {self.onboarding_data.target_language}."
 
     async def _process_websocket_message(self, data):
         """Process different types of messages from the API."""
@@ -521,7 +528,7 @@ class RealtimeAudioConversationAgent:
 
             if function_name == "user_used_native_language_mistake":
                 arguments = json.loads(data.get("arguments", "{}"))
-                await self._user_used_native_language_mistake(arguments)
+                message = await self._user_used_native_language_mistake(arguments)
 
                 # Send function call result back to the API
                 result_message = {
@@ -532,7 +539,7 @@ class RealtimeAudioConversationAgent:
                         "output": json.dumps(
                             {
                                 "success": True,
-                                "message": "Mistake recorded successfully",
+                                "message": message,
                             }
                         ),
                     },
@@ -544,6 +551,10 @@ class RealtimeAudioConversationAgent:
                     )
 
                 await self.websocket.send(json.dumps(result_message))
+
+                # Trigger response generation after function call to keep conversation going
+                response_message = {"type": "response.create"}
+                await self.websocket.send(json.dumps(response_message))
 
             elif function_name == "get_current_time":
                 logfire.info(
@@ -571,6 +582,10 @@ class RealtimeAudioConversationAgent:
                     )
 
                 await self.websocket.send(json.dumps(result_message))
+
+                # Trigger response generation after function call
+                response_message = {"type": "response.create"}
+                await self.websocket.send(json.dumps(response_message))
 
         except Exception as e:
             logfire.exception(f"Error processing function call: {e}")
