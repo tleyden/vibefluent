@@ -231,6 +231,24 @@ class RealtimeAudioConversationAgent:
                             "required": [],
                         },
                     },
+                    {
+                        "type": "function",
+                        "name": "vocab_drill_result",
+                        "description": """
+                            This function will record the result of a vocabulary drill for a particular word
+                            that is being practiced.    
+                        """,
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "drill_word_target_language": {
+                                    "type": "string",
+                                    "description": f"The drill word in {self.onboarding_data.target_language}",
+                                },
+                            },
+                            "required": ["drill_word_target_language"],
+                        },
+                    },
                 ],
                 "tool_choice": "auto",
                 "temperature": 0.8,
@@ -618,6 +636,13 @@ class RealtimeAudioConversationAgent:
             if function_name in vocab_function_calls:
                 # Process vocabulary-related function calls
                 await self.process_vocab_function_call(function_name, data)
+            elif function_name == "vocab_drill_result":
+                logfire.info(
+                    "Processing vocab drill result function call",
+                    data=data,
+                )
+                # TODO: implement vocab drill result processing and respond to keep conversation going
+
             elif function_name == "user_wants_vocab_drill":
                 vocab_words = self.db.get_all_vocab_words(self.onboarding_data)
                 message = f"""
