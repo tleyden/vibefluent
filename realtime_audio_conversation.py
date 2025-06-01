@@ -157,18 +157,18 @@ class RealtimeAudioConversationAgent:
                         "type": "function",
                         "name": "user_used_other_language_mistake",
                         "description": f"""
-                        If the user speaks in their native language {self.onboarding_data.native_language}, 
-                        or any other language, instead of the target language {self.onboarding_data.target_language}, 
-                        consider it a mistake.
+                        This function will be called when the user responds with any words in their native language {self.onboarding_data.native_language}, 
+                        or any other language rather than the target language {self.onboarding_data.target_language}
                         """,
                         "parameters": {
                             "type": "object",
                             "properties": {
                                 "mistake_explanation": {
                                     "type": "string",
-                                    "description": """
+                                    "description": f"""
                                         Brief explanation of the mistake, including the words or phrases that 
-                                        were supposed to be in the target language but were in another language.
+                                        were supposed to be in the target language {self.onboarding_data.target_language} 
+                                        but were in a different language.
                                     """,
                                 },
                             },
