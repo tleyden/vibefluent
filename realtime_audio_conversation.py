@@ -71,9 +71,6 @@ class RealtimeAudioConversationAgent:
             onboarding_data=onboarding_data,
         )
 
-    def generate_initial_question(self) -> str:
-        """Generate a personalized question for realtime audio mode."""
-        return f"Hello {self.onboarding_data.name}! Welcome to realtime audio mode. I'll speak with you to help practice your {self.onboarding_data.target_language}. Start speaking, and I'll respond with audio."
 
     def _create_system_message(self) -> str:
         """Create the system message for the OpenAI Realtime API using template."""
@@ -511,19 +508,25 @@ class RealtimeAudioConversationAgent:
             self.audio.terminate()
 
 
-def run_realtime_audio_loop(conversation_agent, onboarding_data):
+def run_realtime_audio_loop(conversation_agent: RealtimeAudioConversationAgent):
     """Run the realtime audio conversation loop."""
 
     async def audio_loop():
-        print(f"VibeFluent: {conversation_agent.generate_initial_question()}\n")
 
         # Start the realtime conversation
+        # Note this will block indefinitely until conversation is stopped, but no way to stop it 
+        logfire.info(
+            f"Starting realtime audio conversation for {conversation_agent.onboarding_data.name}"
+        )
         success = await conversation_agent.start_conversation()
+        logfire.info(
+            f"Finished realtime audio conversation for {conversation_agent.onboarding_data.name}.  Result: {success}"
+        )
+
         if not success:
-            print(
+            raise RuntimeError(
                 "Failed to start realtime audio mode. Please check your internet connection and API key."
             )
-            return
 
     # Run the async audio loop
     asyncio.run(audio_loop())
@@ -539,4 +542,4 @@ def run_realtime_conversation_loop(onboarding_data):
     print("=" * 60 + "\n")
 
     conversation_agent = RealtimeAudioConversationAgent(onboarding_data)
-    return run_realtime_audio_loop(conversation_agent, onboarding_data)
+    return run_realtime_audio_loop(conversation_agent)
