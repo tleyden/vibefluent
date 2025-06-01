@@ -4,6 +4,9 @@ from sqlalchemy.orm import sessionmaker
 from typing import List
 from datetime import datetime
 from models import VocabWord
+import asyncio
+import concurrent.futures
+
 
 Base = declarative_base()
 
@@ -77,6 +80,20 @@ class Database:
         """Delete all onboarding data from SQLite."""
         self.session.query(OnboardingRecord).delete()
         self.session.commit()
+
+    async def save_vocab_words_async(
+        self, vocab_words, native_language, target_language
+    ):
+        """Async version of save_vocab_words that doesn't block the event loop."""
+        loop = asyncio.get_event_loop()
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            await loop.run_in_executor(
+                executor,
+                self.save_vocab_words,
+                vocab_words,
+                native_language,
+                target_language,
+            )
 
     def save_vocab_words(
         self, vocab_words: List[VocabWord], native_language: str, target_language: str

@@ -380,21 +380,9 @@ class RealtimeAudioConversationAgent:
     #     except Exception as e:
     #         logfire.error(f"Error processing user transcript for vocab: {e}")
 
-    async def _user_used_native_language_mistake(self, mistake_data: dict) -> str:
-        """Record a language mistake made by the user."""
+    async def _extract_vocabulary_from_mistake(self, mistake_data: dict):
         try:
-
             mistake_explanation = mistake_data.get("mistake_explanation", "")
-
-            logfire.info(
-                f"Mistake recorded for {self.onboarding_data.name}: {mistake_explanation}",
-                mistake_data=mistake_data,
-                onboarding_data=self.onboarding_data,
-            )
-
-            print(
-                f"\033[1;33m🔧 Mistake recorded: '{mistake_explanation}'"
-            )
 
             # Extract vocabulary words from the mistake explanation
             prompt = await self.prompt_manager.render_realtime_vocab_extraction_prompt(
@@ -413,10 +401,10 @@ class RealtimeAudioConversationAgent:
                 onboarding_data=self.onboarding_data,
             )
 
-            # Save to database
+            # Save to database asynchronously to avoid blocking the event loop
             vocab_response = result.data
             if vocab_response.vocab_words:
-                self.db.save_vocab_words(
+                await self.db.save_vocab_words_async(
                     vocab_response.vocab_words,
                     self.onboarding_data.native_language,
                     self.onboarding_data.target_language,
@@ -429,10 +417,30 @@ class RealtimeAudioConversationAgent:
                     mistake_explanation=mistake_explanation,
                 )
                 print(
-                    "\033[1;32mNew vocabulary words saved: "
+                    "\033[1;32m🫙 New vocabulary words saved: "
                     + ", ".join(str(word) for word in vocab_response.vocab_words)
                     + "\033[0m"
                 )
+
+        except Exception as e:
+            logfire.exception(
+                f"Error extracting vocab from mistake: {e}", mistake_data=mistake_data
+            )
+
+    async def _user_used_native_language_mistake(self, mistake_data: dict) -> str:
+        """Record a language mistake made by the user."""
+        try:
+            mistake_explanation = mistake_data.get("mistake_explanation", "")
+
+            logfire.info(
+                f"Mistake recorded for {self.onboarding_data.name}: {mistake_explanation}",
+                mistake_data=mistake_data,
+                onboarding_data=self.onboarding_data,
+            )
+
+            print(
+                f"\033[1;33m🔧 Mistake encountered: '{mistake_explanation}'.  Vocab will be extracted and saved"
+            )
 
             return (
                 f"Explain the mistake to the user {mistake_explanation} in "
@@ -560,6 +568,10 @@ class RealtimeAudioConversationAgent:
                 arguments = json.loads(data.get("arguments", "{}"))
                 message = await self._user_used_native_language_mistake(arguments)
 
+                logfire.info(
+                    f"Sending user_used_native_language_mistake function call result: {message}",
+                )
+
                 # Send function call result back to the API
                 result_message = {
                     "type": "conversation.item.create",
@@ -585,6 +597,20 @@ class RealtimeAudioConversationAgent:
                 # Trigger response generation after function call to keep conversation going
                 response_message = {"type": "response.create"}
                 await self.websocket.send(json.dumps(response_message))
+
+                # await self._extract_vocabulary_from_mistake(arguments)
+                # Sleep in case this is blocking other stuff.
+                # asyncio.create_task(
+                #     (
+                #         lambda: asyncio.sleep(15)
+                #         and self._extract_vocabulary_from_mistake(arguments)
+                #     )()
+                # )
+                async def delayed_extract():
+                    await asyncio.sleep(15)
+                    await self._extract_vocabulary_from_mistake(arguments)
+
+                asyncio.create_task(delayed_extract())
 
             elif function_name == "get_current_time":
                 logfire.info(
@@ -620,6 +646,8 @@ class RealtimeAudioConversationAgent:
         except Exception as e:
             logfire.exception(f"Error processing function call: {e}")
             return
+
+
 
     async def start_conversation(self):
         """Start the realtime audio conversation."""
