@@ -150,14 +150,14 @@ class RealtimeAudioConversationAgent:
                     "type": "server_vad",
                     "threshold": 0.85,
                     "prefix_padding_ms": 300,
-                    "silence_duration_ms": 800,
+                    "silence_duration_ms": 1200,
                 },
                 "tools": [
                     {
                         "type": "function",
-                        "name": "user_used_native_language_mistake",
+                        "name": "user_used_other_language_mistake",
                         "description": f"""
-                        If the user uses the native language {self.onboarding_data.native_language}, or any other language, instead of the target language {self.onboarding_data.target_language}, consider it a mistake.
+                        If the user speaks in their native language {self.onboarding_data.native_language}, or any other language, instead of the target language {self.onboarding_data.target_language}, consider it a mistake.
                         """,
                         "parameters": {
                             "type": "object",
@@ -169,6 +169,25 @@ class RealtimeAudioConversationAgent:
                             },
                             "required": [
                                 "mistake_explanation",
+                            ],
+                        },
+                    },
+                    {
+                        "type": "function",
+                        "name": "user_asked_for_translation",
+                        "description": f"""
+                        If the user explicitly asks for the translation of a word into {self.onboarding_data.target_language}, this tool will save that word for future drills.
+                        """,
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "words_needing_translation": {
+                                    "type": "string",
+                                    "description": f"The word or words that the user asked to have translated into {self.onboarding_data.target_language}",
+                                },
+                            },
+                            "required": [
+                                "words_needing_translation",
                             ],
                         },
                     },
@@ -289,10 +308,10 @@ class RealtimeAudioConversationAgent:
             try:
                 message = await self.websocket.recv()
                 data = json.loads(message)
-                logfire.trace(
-                    "Received WebSocket message",
-                    data=data,
-                )
+                # logfire.trace(
+                #     "Received WebSocket message",
+                #     data=data,
+                # )
 
                 await self._process_websocket_message(data)
 
@@ -417,8 +436,7 @@ class RealtimeAudioConversationAgent:
                 f"Error extracting vocab from mistake: {e}", mistake_data=mistake_data
             )
 
-    async def _user_used_native_language_mistake(self, mistake_data: dict) -> str:
-        """Record a language mistake made by the user."""
+    async def _user_used_other_language_mistake(self, mistake_data: dict) -> str:
         try:
             mistake_explanation = mistake_data.get("mistake_explanation", "")
 
@@ -554,12 +572,12 @@ class RealtimeAudioConversationAgent:
             function_name = data.get("name", "")
             logfire.info(f"function name: {function_name}")
 
-            if function_name == "user_used_native_language_mistake":
+            if function_name == "user_used_other_language_mistake":
                 arguments = json.loads(data.get("arguments", "{}"))
-                message = await self._user_used_native_language_mistake(arguments)
+                message = await self._user_used_other_language_mistake(arguments)
 
                 logfire.info(
-                    f"Sending user_used_native_language_mistake function call result: {message}",
+                    f"Sending user_used_other_language_mistake function call result: {message}",
                 )
 
                 # Send function call result back to the API
@@ -595,6 +613,13 @@ class RealtimeAudioConversationAgent:
                     await self._extract_vocabulary_from_mistake(arguments)
 
                 asyncio.create_task(delayed_extract())
+
+            elif function_name == "user_asked_for_translation":
+                arguments = json.loads(data.get("arguments", "{}"))
+                logfire.info(
+                    "Processing user_asked_for_translation function call",
+                    arguments=arguments,
+                )
 
         except Exception as e:
             logfire.exception(f"Error processing function call: {e}")
