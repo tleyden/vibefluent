@@ -19,8 +19,6 @@ from constants import DEFAULT_REALTIME_AUDIO_MODEL, MODE, DEFAULT_REALTIME_AUDIO
 class RealtimeAudioConversationAgent:
     def __init__(self, onboarding_data: OnboardingData):
         self.onboarding_data: OnboardingData = onboarding_data
-        self.conversation_history: List[str] = []
-        self.max_history = 100
         self.db = get_database()
         self.prompt_manager = get_prompt_manager()
         self.factory = LLMAgentFactory()
@@ -62,9 +60,6 @@ class RealtimeAudioConversationAgent:
             raise ValueError(
                 "OPENAI_API_KEY environment variable is required for realtime audio mode"
             )
-
-        # Track pending user transcripts for vocabulary processing
-        self.pending_user_transcripts: List[str] = []
 
         logfire.info(
             f"RealtimeAudioConversationAgent initialized for {self.onboarding_data.name}",
@@ -542,7 +537,6 @@ class RealtimeAudioConversationAgent:
         # Complete assistant transcript received
         transcript = data.get("transcript", "")
         if transcript:
-            self.conversation_history.append(f"Assistant: {transcript}")
             logfire.info(f"Assistant transcript: {transcript}")
 
     async def _handle_response_created(self, data):
@@ -584,11 +578,8 @@ class RealtimeAudioConversationAgent:
         # User's speech was transcribed
         transcript = data.get("transcript", "")
         if transcript:
-            self.conversation_history.append(f"User: {transcript}")
             logfire.info(f"User transcript: {transcript}")
 
-            # Add transcript to pending list for processing after assistant responds
-            self.pending_user_transcripts.append(transcript)
 
     async def _handle_response_cancelled(self, data):
         """Handle response.cancelled messages."""
@@ -599,8 +590,7 @@ class RealtimeAudioConversationAgent:
         self.is_assistant_speaking = False
         # Clear any remaining audio in the queue to stop playback immediately
         self._clear_audio_queue()
-        # Clear pending transcripts since response was cancelled
-        self.pending_user_transcripts = []
+
 
     async def _handle_error(self, data):
         """Handle error messages."""
