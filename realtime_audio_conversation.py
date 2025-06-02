@@ -112,31 +112,6 @@ class RealtimeAudioConversationAgent:
 
     async def _configure_session(self):
         """Configure the OpenAI Realtime session."""
-        # Map common language names to ISO codes for Whisper
-        # language_mapping = {
-        #     "Spanish": "es",
-        #     "French": "fr",
-        #     "German": "de",
-        #     "Italian": "it",
-        #     "Portuguese": "pt",
-        #     "Russian": "ru",
-        #     "Japanese": "ja",
-        #     "Korean": "ko",
-        #     "Chinese": "zh",
-        #     "Mandarin": "zh",
-        #     "Dutch": "nl",
-        #     "Polish": "pl",
-        #     "Turkish": "tr",
-        #     "Arabic": "ar",
-        #     "Hindi": "hi",
-        #     "English": "en",
-        # }
-
-        # Get the ISO language code for the target language
-        # target_lang_code = language_mapping.get(
-        #     self.onboarding_data.target_language, "en"
-        # )
-
         config = {
             "type": "session.update",
             "session": {
@@ -145,16 +120,11 @@ class RealtimeAudioConversationAgent:
                 "voice": DEFAULT_REALTIME_AUDIO_VOICE,
                 "input_audio_format": "pcm16",
                 "output_audio_format": "pcm16",
-                # We don't need to specify input_audio_transcription for realtime audio, no need for it right now
-                # "input_audio_transcription": {
-                #     "model": "whisper-1",
-                #     "language": target_lang_code,
-                # },
                 "turn_detection": {
                     "type": "server_vad",
                     "threshold": 0.85,
                     "prefix_padding_ms": 300,
-                    "silence_duration_ms": 1200,
+                    "silence_duration_ms": 1200,  # very tough to tune
                 },
                 "tools": [
                     {
