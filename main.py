@@ -41,7 +41,7 @@ def main():
                 token=LOGFIRE_API_KEY,
                 service_name=service_name,
                 environment=environment,
-                console=ConsoleOptions(min_log_level="trace"),
+                console=ConsoleOptions(min_log_level="info"),
                 # console=False,
             )
 
