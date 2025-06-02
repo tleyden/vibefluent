@@ -630,7 +630,7 @@ class RealtimeAudioConversationAgent:
                     "Processing vocab drill result function call",
                     data=data,
                 )
-\                await self._process_vocab_drill_result(data)
+                await self._process_vocab_drill_result(data)
 
             elif function_name == "user_wants_vocab_drill":
                 logfire.info(
