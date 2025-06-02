@@ -54,6 +54,10 @@ class RealtimeAudioConversationAgent:
             False  # Track if assistant is currently outputting audio
         )
 
+        # Track drill state to avoid repetition
+        self.drill_instructions_given = False
+        self.drilled_vocab_words: set[str] = set()
+
         # OpenAI API key
         self.api_key = os.getenv("OPENAI_API_KEY")
         if not self.api_key:
@@ -689,24 +693,43 @@ class RealtimeAudioConversationAgent:
     async def _process_user_wants_vocab_drill(self, data):
         vocab_words = self.db.get_all_vocab_words(self.onboarding_data, limit=20)
 
-        message = f"""
-        The user wants to do vocabulary drills.  Run the user through a vocabulary drill session with the following words:
+        # Filter out already drilled words
+        new_vocab_words = [
+            word for word in vocab_words if str(word) not in self.drilled_vocab_words
+        ]
 
-        {vocab_words}
+        # Add new words to drilled set
+        for word in new_vocab_words:
+            self.drilled_vocab_words.add(str(word))
 
-        Before moving onto the next word, try to make sure the user has passed the drill.  However, give up after 3 or 4 attempts
-        if it's too difficult for the user.  If the user is struggling, try to give them a hint or explain the word in their native language.
+        if self.drill_instructions_given:
+            # Just provide the new vocab words without repeating instructions
+            message = f"""
+            The user wants to continue vocabulary drills. Here are additional words to practice:
 
-        Here are some ideas for drill formats you can use, but feel free to come up with your own:
+            {new_vocab_words}
+            """
+        else:
+            # First time - provide full instructions
+            self.drill_instructions_given = True
+            message = f"""
+            The user wants to do vocabulary drills.  Run the user through a vocabulary drill session with the following words:
 
-        - Translation drills: "How do you say [native word] in {self.onboarding_data.target_language}?"
-        - Definition drills: "What does [target word] mean in {self.onboarding_data.native_language}?"
-        - Context drills: "Use the word [target word] in a sentence"
-        - Reverse translation: "What's the {self.onboarding_data.native_language} word for [target word]?"
-        - Listening comprehension: "Speak out 3-4 sentences in {self.onboarding_data.native_language}, and ask the user questions to test their comprehension of the sentences, focusing on the vocabulary words in the questions."
+            {new_vocab_words}
 
-        After finishing with drills, avoid asking the user what they want to talk about, since they often don't know. Instead, suggest topics based on their interests and previous conversations.
-        """
+            Before moving onto the next word, try to make sure the user has passed the drill.  However, give up after 3 or 4 attempts
+            if it's too difficult for the user.  If the user is struggling, try to give them a hint or explain the word in their native language.
+
+            Here are some ideas for drill formats you can use, but feel free to come up with your own:
+
+            - Translation drills: "How do you say [native word] in {self.onboarding_data.target_language}?"
+            - Definition drills: "What does [target word] mean in {self.onboarding_data.native_language}?"
+            - Context drills: "Use the word [target word] in a sentence"
+            - Reverse translation: "What's the {self.onboarding_data.native_language} word for [target word]?"
+            - Listening comprehension: "Speak out 3-4 sentences in {self.onboarding_data.native_language}, and ask the user questions to test their comprehension of the sentences, focusing on the vocabulary words in the questions."
+
+            After finishing with drills, avoid asking the user what they want to talk about, since they often don't know. Instead, suggest topics based on their interests and previous conversations.
+            """
 
         logfire.info(
             "Sending function call result for user_wants_vocab_drill",
