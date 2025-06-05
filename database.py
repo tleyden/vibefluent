@@ -337,20 +337,24 @@ class Database:
         )
 
         # Calculate success rate (0 if never attempted)
+        # Use coalesced values for both numerator and denominator to handle NULLs
+        attempts_count_coalesced = coalesce(latest_tracking.c.total_attempts, 0)
+        correct_attempts_coalesced = coalesce(latest_tracking.c.correct_attempts, 0)
         success_rate = case(
-            (latest_tracking.c.total_attempts == 0, 0.0),
-            else_=cast(latest_tracking.c.correct_attempts, Float)
+            (attempts_count_coalesced == 0, 0.0),
+            else_=cast(correct_attempts_coalesced, Float)
             * 1.0
-            / cast(latest_tracking.c.total_attempts, Float),
+            / cast(attempts_count_coalesced, Float),
         )
 
         # Priority score: higher is better
         # For never attempted words: prioritize recent additions
         # Use a larger base number and ensure we maintain decimal precision
+        # Use coalesced attempts_count instead of raw total_attempts to handle NULLs properly
         priority_score = case(
             # Never attempted - recent words get higher priority
             # Use 10000 as base and subtract days_since_creation to ensure positive priority
-            (latest_tracking.c.total_attempts == 0, 10000.0 - days_since_creation),
+            (attempts_count_coalesced == 0, 10000.0 - days_since_creation),
             # Low success rate - add recency bonus
             (success_rate < 0.5, 5000.0 + days_since_last),
             # Normal spaced repetition - based on time since last attempt
@@ -364,6 +368,8 @@ class Database:
             days_since_last.label("debug_days_since_last"),
             success_rate.label("debug_success_rate"),
             latest_tracking.c.total_attempts.label("debug_total_attempts"),
+            attempts_count_coalesced.label("debug_attempts_count_coalesced"),
+            correct_attempts_coalesced.label("debug_correct_attempts_coalesced"),
         )
 
         # Order by priority (highest first)
@@ -380,6 +386,8 @@ class Database:
             debug_days_since_last,
             debug_success_rate,
             debug_total_attempts,
+            debug_attempts_count_coalesced,
+            debug_correct_attempts_coalesced,
         ) in query.all():
             vocab_word = VocabWord(
                 word_in_target_language=record.vocab_word_target,
@@ -397,6 +405,8 @@ class Database:
                 debug_days_since_last=debug_days_since_last,
                 debug_success_rate=debug_success_rate,
                 debug_total_attempts=debug_total_attempts,
+                debug_attempts_count_coalesced=debug_attempts_count_coalesced,
+                debug_correct_attempts_coalesced=debug_correct_attempts_coalesced,
             )
 
             results.append(
