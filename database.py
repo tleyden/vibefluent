@@ -75,11 +75,8 @@ class Database:
         self.session = Session()
 
     def save_onboarding_data(self, onboarding_data) -> None:
-        """Save or update onboarding data in SQLite."""
-        # Delete existing record (we only store one user's data)
-        self.session.query(OnboardingRecord).delete()
-
-        # Create new record
+        """Save onboarding data in SQLite without deleting existing records."""
+        # Create new record without deleting existing ones
         record = OnboardingRecord(
             name=onboarding_data.name,
             native_language=onboarding_data.native_language,
