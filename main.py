@@ -10,6 +10,7 @@ from logfire import ConsoleOptions
 import os
 import signal
 import sys
+import argparse
 
 
 def signal_handler(sig, frame):
@@ -19,6 +20,17 @@ def signal_handler(sig, frame):
 
 
 def main():
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(
+        description="VibeFluent - Language Learning Assistant"
+    )
+    parser.add_argument(
+        "--new-user",
+        action="store_true",
+        help="Force onboarding of a new user regardless of existing users",
+    )
+    args = parser.parse_args()
+
     # Set up signal handler for Ctrl+C
     signal.signal(signal.SIGINT, signal_handler)
 
@@ -48,18 +60,31 @@ def main():
         logfire.info("VibeFluent application started successfully")
 
     # Check if user has completed onboarding
-    onboarding_data = load_onboarding_data()
-
-    if onboarding_data is None:
-        print("Welcome to VibeFluent! Let's get you set up...")
+    if args.new_user:
+        print("Creating new user profile...")
         onboarding_data = run_onboarding()
         # Reload to get the ID assigned by the database
         onboarding_data = load_onboarding_data()
         print(f"\nWelcome, {onboarding_data.name}! Onboarding complete.")
         print(f"Ready to help you learn {onboarding_data.target_language}!")
     else:
-        print(f"Welcome back, {onboarding_data.name}!")
-        print(f"Continuing your {onboarding_data.target_language} learning journey...")
+        onboarding_data = load_onboarding_data()
+        if onboarding_data is None:
+            print("No profile selected. Exiting.")
+            return
+
+        if onboarding_data is None:
+            print("Welcome to VibeFluent! Let's get you set up...")
+            onboarding_data = run_onboarding()
+            # Reload to get the ID assigned by the database
+            onboarding_data = load_onboarding_data()
+            print(f"\nWelcome, {onboarding_data.name}! Onboarding complete.")
+            print(f"Ready to help you learn {onboarding_data.target_language}!")
+        else:
+            print(f"Welcome back, {onboarding_data.name}!")
+            print(
+                f"Continuing your {onboarding_data.target_language} learning journey..."
+            )
 
     logfire.info(
         "Onboarding data loaded",

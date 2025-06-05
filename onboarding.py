@@ -106,7 +106,40 @@ class OnboardingUI:
 def load_onboarding_data() -> Optional[OnboardingData]:
     """Load onboarding data from SQLite database."""
     db = get_database()
-    return db.load_onboarding_data()
+    records = db.get_all_onboarding_records()
+
+    if not records:
+        return None
+    elif len(records) == 1:
+        return records[0]
+    else:
+        # Multiple records - ask user to choose
+        print("\nMultiple profiles found:")
+        for i, record in enumerate(records, 1):
+            print(
+                f"{i}. {record.name} - {record.target_language} ({record.target_language_level})"
+            )
+
+        while True:
+            try:
+                choice = (
+                    input(f"\nSelect a profile (1-{len(records)}) or 'q' to quit: ")
+                    .strip()
+                    .lower()
+                )
+                if choice == "q":
+                    return None
+                choice_idx = int(choice) - 1
+                if 0 <= choice_idx < len(records):
+                    return records[choice_idx]
+                else:
+                    print(f"Please enter a number between 1 and {len(records)}")
+            except (ValueError, KeyboardInterrupt):
+                if choice == "q":
+                    return None
+                print(
+                    f"Please enter a number between 1 and {len(records)} or 'q' to quit"
+                )
 
 
 def save_onboarding_data(data: OnboardingData) -> None:
