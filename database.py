@@ -281,18 +281,25 @@ class Database:
 
         records = query.all()
 
-        # Calculate spaced repetition priority
+        # Calculate spaced repetition priority and ensure uniqueness
         vocab_with_priority = []
+        seen_vocab_ids = set()
         now = datetime.utcnow()
 
         for record, attempts, correct, last_attempt in records:
+            # Skip if we've already processed this vocab record
+            if record.id in seen_vocab_ids:
+                continue
+
+            seen_vocab_ids.add(record.id)
+
             vocab_word = VocabWord(
                 word_in_target_language=record.vocab_word_target,
                 word_in_native_language=record.vocab_word_native,
             )
 
             priority = self._calculate_spaced_repetition_priority(
-                attempts, correct, last_attempt, now
+                attempts, correct, last_attempt, now, record.created_at
             )
 
             vocab_with_priority.append((vocab_word, priority, attempts, last_attempt))
@@ -307,15 +314,29 @@ class Database:
         ]
 
     def _calculate_spaced_repetition_priority(
-        self, attempts: int, correct: int, last_attempt: datetime | None, now: datetime
+        self,
+        attempts: int,
+        correct: int,
+        last_attempt: datetime | None,
+        now: datetime,
+        created_at: datetime,
     ) -> float:
         """Calculate priority score for spaced repetition.
 
         Higher score = more urgent to review
+        Prioritizes recently added words first.
         """
-        # Never attempted - highest priority
+        # Calculate days since word was created
+        days_since_creation = (now - created_at).total_seconds() / (24 * 3600)
+
+        # Boost priority for recently added words (within last 7 days)
+        recency_boost = 0
+        if days_since_creation <= 7:
+            recency_boost = (7 - days_since_creation) * 50  # Up to 350 point boost
+
+        # Never attempted - very high priority, especially if recent
         if attempts == 0:
-            return 1000.0
+            return 1000.0 + recency_boost
 
         # Calculate success rate
         success_rate = correct / attempts if attempts > 0 else 0.0
@@ -345,6 +366,9 @@ class Database:
         # Boost priority for words with low success rates
         if success_rate < 0.5:
             priority *= 2
+
+        # Add recency boost to final priority
+        priority += recency_boost
 
         return max(0, priority)
 
