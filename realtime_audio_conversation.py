@@ -112,11 +112,18 @@ class RealtimeAudioConversationAgent:
 
     async def _configure_session(self):
         """Configure the OpenAI Realtime session."""
+
+        instructions = self._create_system_message()
+        logfire.info(
+            f"Configuring session for {self.onboarding_data.name}",
+            instructions=instructions,
+        )
+
         config = {
             "type": "session.update",
             "session": {
                 "modalities": ["text", "audio"],
-                "instructions": self._create_system_message(),
+                "instructions": instructions,
                 "voice": DEFAULT_REALTIME_AUDIO_VOICE,
                 "input_audio_format": "pcm16",
                 "output_audio_format": "pcm16",
