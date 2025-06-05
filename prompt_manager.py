@@ -1,7 +1,7 @@
 from jinja2 import Environment, FileSystemLoader
 from pathlib import Path
 from typing import Dict, Any
-from onboarding import OnboardingData
+from models import OnboardingData
 from models import VocabWord
 from typing import List
 

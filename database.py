@@ -14,6 +14,8 @@ from datetime import datetime
 import asyncio
 import concurrent.futures
 from models import VocabWord
+from models import OnboardingData
+
 import logfire
 
 Base = declarative_base()
@@ -87,7 +89,6 @@ class Database:
         """Load onboarding data from SQLite."""
         record = self.session.query(OnboardingRecord).first()
         if record:
-            from onboarding import OnboardingData
 
             return OnboardingData(
                 name=record.name,
@@ -148,7 +149,7 @@ class Database:
         self.session.commit()
 
     def get_all_vocab_words(
-        self, onboarding_data, limit: int = None
+        self, onboarding_data: OnboardingData, limit: int = None
     ) -> List[VocabWord]:
         """Get all vocabulary words for the given language pair."""
         query = self.session.query(VocabRecord).filter_by(
@@ -238,7 +239,7 @@ class Database:
             )
 
     def get_vocab_words_for_spaced_repetition(
-        self, onboarding_data, limit: int = 10
+        self, onboarding_data: OnboardingData, limit: int = 10
     ) -> List[Tuple[VocabWord, int, datetime]]:
         """Get vocabulary words ordered by spaced repetition priority.
 

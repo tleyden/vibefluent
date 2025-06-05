@@ -7,7 +7,7 @@ import threading
 import queue
 import os
 from typing import Optional
-from onboarding import OnboardingData
+from models import OnboardingData
 from models import VocabExtractResponse
 from database import get_database
 from prompt_manager import get_prompt_manager

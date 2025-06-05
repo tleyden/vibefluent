@@ -1,6 +1,13 @@
 from pydantic import BaseModel
 from typing import List
 
+class OnboardingData(BaseModel):
+    name: str
+    native_language: str
+    target_language: str
+    conversation_interests: str
+    target_language_level: str
+    reason_for_learning: str
 
 class VocabWord(BaseModel):
     word_in_target_language: str
