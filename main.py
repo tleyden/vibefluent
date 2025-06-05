@@ -53,11 +53,18 @@ def main():
     if onboarding_data is None:
         print("Welcome to VibeFluent! Let's get you set up...")
         onboarding_data = run_onboarding()
+        # Reload to get the ID assigned by the database
+        onboarding_data = load_onboarding_data()
         print(f"\nWelcome, {onboarding_data.name}! Onboarding complete.")
         print(f"Ready to help you learn {onboarding_data.target_language}!")
     else:
         print(f"Welcome back, {onboarding_data.name}!")
         print(f"Continuing your {onboarding_data.target_language} learning journey...")
+
+    logfire.info(
+        "Onboarding data loaded",
+        onboarding_data=onboarding_data,
+    )
 
     # Start the conversation loop
     # Initialize agents and database based on mode

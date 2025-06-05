@@ -1,13 +1,16 @@
 from pydantic import BaseModel
 from typing import List
 
+
 class OnboardingData(BaseModel):
+    id: int | None = None
     name: str
     native_language: str
     target_language: str
     conversation_interests: str
     target_language_level: str
     reason_for_learning: str
+
 
 class VocabWord(BaseModel):
     word_in_target_language: str
@@ -21,7 +24,6 @@ class ConversationResponse(BaseModel):
     assistant_message: str
     follow_up_question: str
     vocab_words_user_asked_about: List[VocabWord] = []
-
 
 
 class VocabExtractResponse(BaseModel):

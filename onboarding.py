@@ -3,6 +3,7 @@ from typing import Optional
 from database import get_database
 from models import OnboardingData
 
+
 class OnboardingUI:
     def __init__(self):
         self.questions = [
@@ -92,6 +93,7 @@ class OnboardingUI:
 
     def create_onboarding_data(self) -> OnboardingData:
         return OnboardingData(
+            id=None,  # Will be set when saved to database
             name=self.answers.get("Name", ""),
             native_language=self.answers.get("Native Language", ""),
             target_language=self.answers.get("Target Language", ""),

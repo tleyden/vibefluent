@@ -89,8 +89,8 @@ class Database:
         """Load onboarding data from SQLite."""
         record = self.session.query(OnboardingRecord).first()
         if record:
-
             return OnboardingData(
+                id=record.id,
                 name=record.name,
                 native_language=record.native_language,
                 target_language=record.target_language,
