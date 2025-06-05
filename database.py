@@ -264,10 +264,10 @@ class Database:
 
     def get_vocab_words_for_spaced_repetition(
         self, onboarding_data: OnboardingData, limit: int = 10
-    ) -> List[Tuple[VocabWord, int, datetime]]:
+    ) -> List[Tuple[VocabWord, int, datetime, int, float]]:
         """Get vocabulary words ordered by spaced repetition priority.
 
-        Returns tuples of (VocabWord, attempts_count, last_attempt_date)
+        Returns tuples of (VocabWord, attempts_count, last_attempt_date, correct_attempts, priority).
         """
         if onboarding_data.id is None:
             logfire.warning(
@@ -275,9 +275,9 @@ class Database:
             )
             return []
 
-        from sqlalchemy import case
+        from sqlalchemy import case, func
         from sqlalchemy.sql.functions import coalesce
-        from sqlalchemy import func
+        from datetime import datetime
 
         # Subquery to get latest tracking info for each vocab word
         latest_tracking = (
@@ -293,53 +293,92 @@ class Database:
             .subquery()
         )
 
-        # Main query joining vocab records with tracking data, filtered by user
+        # Main query joining vocab records with tracking data, filtered by user AND target language
         query = (
             self.session.query(
                 VocabRecord,
-                coalesce(latest_tracking.c.total_attempts, 0).label("attempts"),
-                coalesce(latest_tracking.c.correct_attempts, 0).label("correct"),
-                latest_tracking.c.last_attempt,
+                coalesce(latest_tracking.c.total_attempts, 0).label("attempts_count"),
+                latest_tracking.c.last_attempt.label("last_attempt_date"),
+                coalesce(latest_tracking.c.correct_attempts, 0).label(
+                    "correct_attempts"
+                ),
             )
-            .filter(VocabRecord.onboarding_record_id == onboarding_data.id)
             .outerjoin(
                 latest_tracking, VocabRecord.id == latest_tracking.c.vocab_record_id
             )
+            .filter(VocabRecord.onboarding_record_id == onboarding_data.id)
+            .filter(VocabRecord.target_language == onboarding_data.target_language)
         )
 
-        records = query.all()
+        # Calculate priority for spaced repetition
+        # Priority factors:
+        # 1. Never attempted words get highest priority
+        # 2. Words with low success rate get higher priority
+        # 3. Words not seen recently get higher priority
 
-        # Calculate spaced repetition priority and ensure uniqueness
-        vocab_with_priority = []
-        seen_vocab_ids = set()
-        now = datetime.utcnow()
+        now = datetime.now()
 
-        for record, attempts, correct, last_attempt in records:
-            # Skip if we've already processed this vocab record
-            if record.id in seen_vocab_ids:
-                continue
+        # Calculate days since last attempt (0 if never attempted)
+        days_since_last = case(
+            (latest_tracking.c.last_attempt.is_(None), 0),
+            else_=func.julianday(now) - func.julianday(latest_tracking.c.last_attempt),
+        )
 
-            seen_vocab_ids.add(record.id)
+        # Calculate success rate (0 if never attempted)
+        success_rate = case(
+            (latest_tracking.c.total_attempts == 0, 0),
+            else_=latest_tracking.c.correct_attempts
+            * 1.0
+            / latest_tracking.c.total_attempts,
+        )
 
+        # Priority score: higher is better
+        # Never attempted = 1000 (highest priority)
+        # Recently failed = high priority based on days since last attempt
+        # Long time since last attempt = medium priority
+        priority_score = case(
+            (latest_tracking.c.total_attempts == 0, 1000),  # Never attempted
+            (success_rate < 0.5, 500 + days_since_last),  # Low success rate
+            else_=days_since_last,  # Based on recency
+        )
+
+        query = query.add_columns(priority_score.label("priority"))
+
+        # Order by priority (highest first), then by creation date
+        query = query.order_by(
+            priority_score.desc(), VocabRecord.created_at.asc()
+        ).limit(limit)
+
+        results = []
+        for (
+            record,
+            attempts_count,
+            last_attempt_date,
+            correct_attempts,
+            priority,
+        ) in query.all():
             vocab_word = VocabWord(
                 word_in_target_language=record.vocab_word_target,
                 word_in_native_language=record.vocab_word_native,
             )
-
-            priority = self._calculate_spaced_repetition_priority(
-                attempts, correct, last_attempt, now, record.created_at
+            results.append(
+                (
+                    vocab_word,
+                    attempts_count,
+                    last_attempt_date,
+                    correct_attempts,
+                    priority,
+                )
             )
 
-            vocab_with_priority.append((vocab_word, priority, attempts, last_attempt))
+        logfire.info(
+            f"Retrieved {len(results)} vocab words for spaced repetition",
+            user_id=onboarding_data.id,
+            target_language=onboarding_data.target_language,
+            results=results,
+        )
 
-        # Sort by priority (higher = more urgent to review)
-        vocab_with_priority.sort(key=lambda x: x[1], reverse=True)
-
-        # Return top words with their stats
-        return [
-            (word, attempts, last_attempt)
-            for word, _, attempts, last_attempt in vocab_with_priority[:limit]
-        ]
+        return results
 
     def _calculate_spaced_repetition_priority(
         self,

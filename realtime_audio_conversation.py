@@ -73,16 +73,22 @@ class RealtimeAudioConversationAgent:
     def _create_system_message(self) -> str:
         """Create the system message for the OpenAI Realtime API using template."""
         vocab_words_and_stats = self.db.get_vocab_words_for_spaced_repetition(
-            onboarding_data=self.onboarding_data, limit=30
+            onboarding_data=self.onboarding_data,
+            limit=20,
         )
-        vocab_words = [word for word, _, _ in vocab_words_and_stats]
+        logfire.info(
+            f"Fetched {len(vocab_words_and_stats)} vocab words for spaced repetition",
+            onboarding_data=self.onboarding_data,
+            vocab_words_and_stats=vocab_words_and_stats,
+        )
+        vocab_words = [word for word, _, _, _, _ in vocab_words_and_stats]
         vocab_context = ""
         if vocab_words:
             vocab_list = [
                 f"{w.word_in_target_language} ({w.word_in_native_language})"
                 for w in vocab_words
             ]
-            vocab_context = f"{', '.join(vocab_list)}"
+            vocab_context = f"{'\n'.join(vocab_list)}"
 
         return self.prompt_manager.render_realtime_session_config(
             self.onboarding_data, vocab_context
@@ -110,7 +116,7 @@ class RealtimeAudioConversationAgent:
             await self._configure_session()
             return True
         except Exception as e:
-            logfire.error(f"Failed to connect to OpenAI Realtime API: {e}")
+            logfire.exception(f"Failed to connect to OpenAI Realtime API: {e}")
             return False
 
     async def _configure_session(self):
@@ -118,7 +124,7 @@ class RealtimeAudioConversationAgent:
 
         instructions = self._create_system_message()
         logfire.info(
-            f"Configuring session for {self.onboarding_data.name}",
+            f"Configuring session for {self.onboarding_data.name} with instructions",
             instructions=instructions,
         )
 
@@ -700,7 +706,7 @@ class RealtimeAudioConversationAgent:
             vocab_word_and_stats=vocab_word_and_stats,
         )
 
-        vocab_words = [word for word, _, _ in vocab_word_and_stats]
+        vocab_words = [word for word, _, _, _, _ in vocab_word_and_stats]
 
         if self.drill_instructions_given:
             # Just provide the new vocab words without repeating instructions
