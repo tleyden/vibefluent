@@ -685,17 +685,6 @@ class RealtimeAudioConversationAgent:
         await self._create_response_keep_conversation_going()
 
     async def _process_user_wants_vocab_drill(self, data):
-        # vocab_words = self.db.get_all_vocab_words(self.onboarding_data, limit=20)
-
-        # # Filter out already drilled words
-        # new_vocab_words = [
-        #     word for word in vocab_words if str(word) not in self.drilled_vocab_words
-        # ]
-
-        # # Add new words to drilled set
-        # for word in new_vocab_words:
-        #     self.drilled_vocab_words.add(str(word))
-
         vocab_word_and_stats = self.db.get_vocab_words_for_spaced_repetition(
             self.onboarding_data,
             limit=20,

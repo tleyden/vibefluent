@@ -15,8 +15,9 @@ import asyncio
 import concurrent.futures
 from models import VocabWord
 from models import OnboardingData
-
 import logfire
+from sqlalchemy import case, func, cast, Float
+from sqlalchemy.sql.functions import coalesce
 
 Base = declarative_base()
 
@@ -179,15 +180,6 @@ class Database:
 
         records = query.all()
 
-        # ## experimental testing
-        # spaced_repetition_words = self.get_vocab_words_for_spaced_repetition(
-        #     onboarding_data=onboarding_data, limit=20
-        # )
-        # logfire.info(
-        #     f"Retrieved {len(records)} vocab words and {len(spaced_repetition_words)} spaced repetition vocab words for user {onboarding_data.name}",
-        #     spaced_repetition_words=spaced_repetition_words,
-        # )
-
         return [
             VocabWord(
                 word_in_target_language=record.vocab_word_target,
@@ -274,10 +266,6 @@ class Database:
                 "OnboardingData has no ID. Cannot retrieve spaced repetition words."
             )
             return []
-
-        from sqlalchemy import case, func, cast, Float
-        from sqlalchemy.sql.functions import coalesce
-        from datetime import datetime
 
         # Subquery to get latest tracking info for each vocab word
         latest_tracking = (
