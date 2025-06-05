@@ -476,6 +476,22 @@ class Database:
 
         return max(0, priority)
 
+    def get_all_onboarding_records(self) -> List[OnboardingData]:
+        """Get all onboarding records from SQLite."""
+        records = self.session.query(OnboardingRecord).all()
+        return [
+            OnboardingData(
+                id=record.id,
+                name=record.name,
+                native_language=record.native_language,
+                target_language=record.target_language,
+                conversation_interests=record.conversation_interests,
+                target_language_level=record.target_language_level,
+                reason_for_learning=record.reason_for_learning,
+            )
+            for record in records
+        ]
+
 
 # Global database instance
 _database = None
