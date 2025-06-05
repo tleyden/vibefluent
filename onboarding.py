@@ -122,9 +122,11 @@ def load_onboarding_data() -> Optional[OnboardingData]:
 
         while True:
             try:
-                choice = input(
-                    f"\nSelect a profile (1-{len(records)}) or 'q' to quit: "
-                ).strip().lower()
+                choice = (
+                    input(f"\nSelect a profile (1-{len(records)}) or 'q' to quit: ")
+                    .strip()
+                    .lower()
+                )
                 if choice == "q":
                     return None
                 choice_idx = int(choice) - 1
