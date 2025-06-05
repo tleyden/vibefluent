@@ -32,11 +32,15 @@ class OnboardingRecord(Base):
     target_language_level = Column(String, nullable=False)
     reason_for_learning = Column(String, nullable=False)
 
+    # Relationship to vocab records
+    vocab_records = relationship("VocabRecord", back_populates="onboarding_record")
+
 
 class VocabRecord(Base):
     __tablename__ = "vocab"
 
     id = Column(Integer, primary_key=True)
+    onboarding_record_id = Column(Integer, ForeignKey("onboarding.id"), nullable=False)
     native_language = Column(String, nullable=False)
     target_language = Column(String, nullable=False)
     vocab_word_native = Column(String, nullable=False)
@@ -45,6 +49,8 @@ class VocabRecord(Base):
 
     # Relationship to tracking records
     tracking_records = relationship("VocabTracking", back_populates="vocab_record")
+    # Relationship to onboarding record
+    onboarding_record = relationship("OnboardingRecord", back_populates="vocab_records")
 
 
 class VocabTracking(Base):
@@ -123,13 +129,20 @@ class Database:
         self, vocab_words: List[VocabWord], native_language: str, target_language: str
     ) -> None:
         """Save vocabulary words to the vocab table."""
+        # Get the current onboarding record to link vocab words to it
+        onboarding_record = self.session.query(OnboardingRecord).first()
+        if not onboarding_record:
+            logfire.warning(
+                "No onboarding record found. Cannot save vocab words without user context."
+            )
+            return
+
         for vocab_word in vocab_words:
-            # Check if this vocab pair already exists
+            # Check if this vocab pair already exists for this user
             existing_record = (
                 self.session.query(VocabRecord)
                 .filter_by(
-                    native_language=native_language,
-                    target_language=target_language,
+                    onboarding_record_id=onboarding_record.id,
                     vocab_word_native=vocab_word.word_in_native_language,
                     vocab_word_target=vocab_word.word_in_target_language,
                 )
@@ -139,6 +152,7 @@ class Database:
             if not existing_record:
                 # Create new record
                 record = VocabRecord(
+                    onboarding_record_id=onboarding_record.id,
                     native_language=native_language,
                     target_language=target_language,
                     vocab_word_native=vocab_word.word_in_native_language,
@@ -151,10 +165,13 @@ class Database:
     def get_all_vocab_words(
         self, onboarding_data: OnboardingData, limit: int = None
     ) -> List[VocabWord]:
-        """Get all vocabulary words for the given language pair."""
+        """Get all vocabulary words for the given user."""
+        if onboarding_data.id is None:
+            logfire.warning("OnboardingData has no ID. Cannot retrieve vocab words.")
+            return []
+
         query = self.session.query(VocabRecord).filter_by(
-            native_language=onboarding_data.native_language,
-            target_language=onboarding_data.target_language,
+            onboarding_record_id=onboarding_data.id
         )
 
         if limit:
@@ -167,7 +184,7 @@ class Database:
             onboarding_data=onboarding_data, limit=20
         )
         logfire.info(
-            f"Retrieved {len(records)} spaced repetition vocab words for {onboarding_data.native_language} to {onboarding_data.target_language}",
+            f"Retrieved {len(records)} vocab words and {len(spaced_repetition_words)} spaced repetition vocab words for user {onboarding_data.name}",
             spaced_repetition_words=spaced_repetition_words,
         )
 
@@ -211,12 +228,19 @@ class Database:
             f"Attempting to save drill result for {vocab_word_target_language} - Did it pass: {passed}"
         )
 
-        # Find the corresponding vocab record
+        # Get the current onboarding record
+        onboarding_record = self.session.query(OnboardingRecord).first()
+        if not onboarding_record:
+            logfire.warning(
+                "No onboarding record found. Cannot save drill result without user context."
+            )
+            return
+
+        # Find the corresponding vocab record for this user
         vocab_record = (
             self.session.query(VocabRecord)
             .filter_by(
-                native_language=native_language,
-                target_language=target_language,
+                onboarding_record_id=onboarding_record.id,
                 vocab_word_target=vocab_word_target_language,
             )
             .first()
@@ -235,7 +259,7 @@ class Database:
             self.session.commit()
         else:
             logfire.warning(
-                f"Could not find vocab record for {vocab_word_target_language}.  Ignoring drill result."
+                f"Could not find vocab record for {vocab_word_target_language} for current user. Ignoring drill result."
             )
 
     def get_vocab_words_for_spaced_repetition(
@@ -245,6 +269,12 @@ class Database:
 
         Returns tuples of (VocabWord, attempts_count, last_attempt_date)
         """
+        if onboarding_data.id is None:
+            logfire.warning(
+                "OnboardingData has no ID. Cannot retrieve spaced repetition words."
+            )
+            return []
+
         from sqlalchemy import case
         from sqlalchemy.sql.functions import coalesce
         from sqlalchemy import func
@@ -263,7 +293,7 @@ class Database:
             .subquery()
         )
 
-        # Main query joining vocab records with tracking data
+        # Main query joining vocab records with tracking data, filtered by user
         query = (
             self.session.query(
                 VocabRecord,
@@ -271,10 +301,7 @@ class Database:
                 coalesce(latest_tracking.c.correct_attempts, 0).label("correct"),
                 latest_tracking.c.last_attempt,
             )
-            .filter(
-                VocabRecord.native_language == onboarding_data.native_language,
-                VocabRecord.target_language == onboarding_data.target_language,
-            )
+            .filter(VocabRecord.onboarding_record_id == onboarding_data.id)
             .outerjoin(
                 latest_tracking, VocabRecord.id == latest_tracking.c.vocab_record_id
             )
