@@ -1,16 +1,7 @@
 import curses
 from typing import Optional
-from pydantic import BaseModel
 from database import get_database
-
-
-class OnboardingData(BaseModel):
-    name: str
-    native_language: str
-    target_language: str
-    conversation_interests: str
-    target_language_level: str
-    reason_for_learning: str
+from models import OnboardingData
 
 
 class OnboardingUI:
@@ -102,6 +93,7 @@ class OnboardingUI:
 
     def create_onboarding_data(self) -> OnboardingData:
         return OnboardingData(
+            id=None,  # Will be set when saved to database
             name=self.answers.get("Name", ""),
             native_language=self.answers.get("Native Language", ""),
             target_language=self.answers.get("Target Language", ""),

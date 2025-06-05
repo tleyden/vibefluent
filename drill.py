@@ -1,6 +1,6 @@
 from typing import List, Optional
 from llm_agent_factory import LLMAgentFactory
-from onboarding import OnboardingData
+from models import OnboardingData
 from models import VocabWord
 from database import get_database
 import random

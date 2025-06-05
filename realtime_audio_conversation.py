@@ -7,7 +7,7 @@ import threading
 import queue
 import os
 from typing import Optional
-from onboarding import OnboardingData
+from models import OnboardingData
 from models import VocabExtractResponse
 from database import get_database
 from prompt_manager import get_prompt_manager
@@ -56,7 +56,7 @@ class RealtimeAudioConversationAgent:
 
         # Track drill state to avoid repetition
         self.drill_instructions_given = False
-        self.drilled_vocab_words: set[str] = set()
+        # self.drilled_vocab_words: set[str] = set()
 
         # OpenAI API key
         self.api_key = os.getenv("OPENAI_API_KEY")
@@ -72,14 +72,23 @@ class RealtimeAudioConversationAgent:
 
     def _create_system_message(self) -> str:
         """Create the system message for the OpenAI Realtime API using template."""
-        vocab_words = self.db.get_all_vocab_words(self.onboarding_data, limit=20)
+        vocab_words_and_stats = self.db.get_vocab_words_for_spaced_repetition(
+            onboarding_data=self.onboarding_data,
+            limit=20,
+        )
+        logfire.info(
+            f"Fetched {len(vocab_words_and_stats)} vocab words for spaced repetition",
+            onboarding_data=self.onboarding_data,
+            vocab_words_and_stats=vocab_words_and_stats,
+        )
+        vocab_words = [word for word, _, _, _, _ in vocab_words_and_stats]
         vocab_context = ""
         if vocab_words:
             vocab_list = [
                 f"{w.word_in_target_language} ({w.word_in_native_language})"
                 for w in vocab_words
             ]
-            vocab_context = f"\nVocabulary words to practice: {', '.join(vocab_list)}"
+            vocab_context = f"{'\n'.join(vocab_list)}"
 
         return self.prompt_manager.render_realtime_session_config(
             self.onboarding_data, vocab_context
@@ -107,7 +116,7 @@ class RealtimeAudioConversationAgent:
             await self._configure_session()
             return True
         except Exception as e:
-            logfire.error(f"Failed to connect to OpenAI Realtime API: {e}")
+            logfire.exception(f"Failed to connect to OpenAI Realtime API: {e}")
             return False
 
     async def _configure_session(self):
@@ -115,7 +124,7 @@ class RealtimeAudioConversationAgent:
 
         instructions = self._create_system_message()
         logfire.info(
-            f"Configuring session for {self.onboarding_data.name}",
+            f"Configuring session for {self.onboarding_data.name} with instructions",
             instructions=instructions,
         )
 
@@ -655,35 +664,45 @@ class RealtimeAudioConversationAgent:
     async def _process_vocab_drill_result(self, data):
         arguments = json.loads(data.get("arguments", "{}"))
         drill_word_target_language = arguments.get("drill_word_target_language", "")
-        drill_score = arguments.get("drill_score", False)
+        drill_score: bool = arguments.get("drill_score", False)
         logfire.info(
             f"Processing vocab drill result. Pass/fail: {drill_score} for word: {drill_word_target_language}",
             drill_word_target_language=drill_word_target_language,
             drill_score=drill_score,
         )
 
+        if not self.db:
+            raise RuntimeError("Database connection is not initialized.")
+
         # TODO: update the DB with the result of the vocab drill
+        await self.db.save_vocab_drill_result_async(
+            vocab_word_target_language=drill_word_target_language,
+            native_language=self.onboarding_data.native_language,
+            target_language=self.onboarding_data.target_language,
+            passed=drill_score,
+        )
 
         await self._create_response_keep_conversation_going()
 
     async def _process_user_wants_vocab_drill(self, data):
-        vocab_words = self.db.get_all_vocab_words(self.onboarding_data, limit=20)
+        vocab_word_and_stats = self.db.get_vocab_words_for_spaced_repetition(
+            self.onboarding_data,
+            limit=20,
+        )
+        logfire.info(
+            f"Fetched {len(vocab_word_and_stats)} vocab words for spaced repetition",
+            onboarding_data=self.onboarding_data,
+            vocab_word_and_stats=vocab_word_and_stats,
+        )
 
-        # Filter out already drilled words
-        new_vocab_words = [
-            word for word in vocab_words if str(word) not in self.drilled_vocab_words
-        ]
-
-        # Add new words to drilled set
-        for word in new_vocab_words:
-            self.drilled_vocab_words.add(str(word))
+        vocab_words = [word for word, _, _, _, _ in vocab_word_and_stats]
 
         if self.drill_instructions_given:
             # Just provide the new vocab words without repeating instructions
             message = f"""
             The user wants to continue vocabulary drills. Here are additional words to practice:
 
-            {new_vocab_words}
+            {vocab_words}
             """
         else:
             # First time - provide full instructions
@@ -691,7 +710,7 @@ class RealtimeAudioConversationAgent:
             message = f"""
             The user wants to do vocabulary drills.  Run the user through a vocabulary drill session with the following words:
 
-            {new_vocab_words}
+            {vocab_words}
 
             Before moving onto the next word, try to make sure the user has passed the drill.  However, give up after 3 or 4 attempts
             if it's too difficult for the user.  If the user is struggling, try to give them a hint or explain the word in their native language.

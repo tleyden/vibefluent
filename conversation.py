@@ -2,8 +2,7 @@ from typing import List
 from constants import MODE
 from drill import VocabDrillAgent
 from llm_agent_factory import LLMAgentFactory
-from onboarding import OnboardingData
-from models import ConversationResponse
+from models import ConversationResponse, OnboardingData
 from database import get_database
 from prompt_manager import get_prompt_manager
 import logfire
@@ -128,7 +127,7 @@ class ConversationAgent:
         return result.data
 
 
-def run_text_conversation_loop(onboarding_data):
+def run_text_conversation_loop(onboarding_data: OnboardingData):
     """Run the main conversation loop with drill mode support."""
     print("\n" + "=" * 60)
     print("🌍 Welcome to your conversation practice! 🌍")
