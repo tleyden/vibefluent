@@ -312,17 +312,11 @@ class Database:
 
         # Calculate priority for spaced repetition
         # Priority factors:
-        # 1. Never attempted words get highest priority (prioritizing recent additions)
+        # 1. Never attempted words get highest priority
         # 2. Words with low success rate get higher priority
         # 3. Words not seen recently get higher priority
 
         now = datetime.now()
-
-        # Calculate days since creation (for prioritizing recent additions)
-        days_since_creation = case(
-            (VocabRecord.created_at.is_(None), 999),
-            else_=func.julianday(now) - func.julianday(VocabRecord.created_at),
-        )
 
         # Calculate days since last attempt (0 if never attempted)
         days_since_last = case(
@@ -339,22 +333,20 @@ class Database:
         )
 
         # Priority score: higher is better
-        # Never attempted words: prioritize recent additions (lower days_since_creation = higher priority)
-        # For attempted words: use spaced repetition logic
+        # Never attempted = 1000 (highest priority)
+        # Recently failed = high priority based on days since last attempt
+        # Long time since last attempt = medium priority
         priority_score = case(
-            # Never attempted - prioritize recent additions (1000 - days_since_creation)
-            (latest_tracking.c.total_attempts == 0, 1000 - days_since_creation),
-            # Low success rate - add recency bonus
-            (success_rate < 0.5, 500 + days_since_last),
-            # Normal spaced repetition - based on time since last attempt
-            else_=days_since_last,
+            (latest_tracking.c.total_attempts == 0, 1000),  # Never attempted
+            (success_rate < 0.5, 500 + days_since_last),  # Low success rate
+            else_=days_since_last,  # Based on recency
         )
 
         query = query.add_columns(priority_score.label("priority"))
 
-        # Order by priority (highest first), then by creation date descending (newest first) as tiebreaker
+        # Order by priority (highest first), then by creation date
         query = query.order_by(
-            priority_score.desc(), VocabRecord.created_at.desc()
+            priority_score.desc(), VocabRecord.created_at.asc()
         ).limit(limit)
 
         results = []
