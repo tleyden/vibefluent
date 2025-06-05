@@ -179,14 +179,14 @@ class Database:
 
         records = query.all()
 
-        ## experimental testing
-        spaced_repetition_words = self.get_vocab_words_for_spaced_repetition(
-            onboarding_data=onboarding_data, limit=20
-        )
-        logfire.info(
-            f"Retrieved {len(records)} vocab words and {len(spaced_repetition_words)} spaced repetition vocab words for user {onboarding_data.name}",
-            spaced_repetition_words=spaced_repetition_words,
-        )
+        # ## experimental testing
+        # spaced_repetition_words = self.get_vocab_words_for_spaced_repetition(
+        #     onboarding_data=onboarding_data, limit=20
+        # )
+        # logfire.info(
+        #     f"Retrieved {len(records)} vocab words and {len(spaced_repetition_words)} spaced repetition vocab words for user {onboarding_data.name}",
+        #     spaced_repetition_words=spaced_repetition_words,
+        # )
 
         return [
             VocabWord(
