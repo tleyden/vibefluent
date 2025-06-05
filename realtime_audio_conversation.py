@@ -74,7 +74,7 @@ class RealtimeAudioConversationAgent:
         """Create the system message for the OpenAI Realtime API using template."""
         vocab_words_and_stats = self.db.get_vocab_words_for_spaced_repetition(
             onboarding_data=self.onboarding_data,
-            limit=20,
+            limit=100,  # temp limit for testing
         )
         logfire.info(
             f"Fetched {len(vocab_words_and_stats)} vocab words for spaced repetition",

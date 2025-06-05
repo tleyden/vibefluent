@@ -275,7 +275,7 @@ class Database:
             )
             return []
 
-        from sqlalchemy import case, func
+        from sqlalchemy import case, func, cast, Float
         from sqlalchemy.sql.functions import coalesce
         from datetime import datetime
 
@@ -312,42 +312,62 @@ class Database:
 
         # Calculate priority for spaced repetition
         # Priority factors:
-        # 1. Never attempted words get highest priority
+        # 1. Never attempted words get highest priority (with recent words prioritized)
         # 2. Words with low success rate get higher priority
         # 3. Words not seen recently get higher priority
 
         now = datetime.now()
 
+        # Calculate days since creation (for prioritizing recent additions)
+        # Use cast to Float to ensure we get decimal precision
+        days_since_creation = case(
+            (VocabRecord.created_at.is_(None), 999.0),
+            else_=cast(
+                func.julianday(now) - func.julianday(VocabRecord.created_at), Float
+            ),
+        )
+
         # Calculate days since last attempt (0 if never attempted)
         days_since_last = case(
-            (latest_tracking.c.last_attempt.is_(None), 0),
-            else_=func.julianday(now) - func.julianday(latest_tracking.c.last_attempt),
+            (latest_tracking.c.last_attempt.is_(None), 0.0),
+            else_=cast(
+                func.julianday(now) - func.julianday(latest_tracking.c.last_attempt),
+                Float,
+            ),
         )
 
         # Calculate success rate (0 if never attempted)
         success_rate = case(
-            (latest_tracking.c.total_attempts == 0, 0),
-            else_=latest_tracking.c.correct_attempts
+            (latest_tracking.c.total_attempts == 0, 0.0),
+            else_=cast(latest_tracking.c.correct_attempts, Float)
             * 1.0
-            / latest_tracking.c.total_attempts,
+            / cast(latest_tracking.c.total_attempts, Float),
         )
 
         # Priority score: higher is better
-        # Never attempted = 1000 (highest priority)
-        # Recently failed = high priority based on days since last attempt
-        # Long time since last attempt = medium priority
+        # For never attempted words: prioritize recent additions
+        # Use a larger base number and ensure we maintain decimal precision
         priority_score = case(
-            (latest_tracking.c.total_attempts == 0, 1000),  # Never attempted
-            (success_rate < 0.5, 500 + days_since_last),  # Low success rate
-            else_=days_since_last,  # Based on recency
+            # Never attempted - recent words get higher priority
+            # Use 10000 as base and subtract days_since_creation to ensure positive priority
+            (latest_tracking.c.total_attempts == 0, 10000.0 - days_since_creation),
+            # Low success rate - add recency bonus
+            (success_rate < 0.5, 5000.0 + days_since_last),
+            # Normal spaced repetition - based on time since last attempt
+            else_=days_since_last,
         )
 
-        query = query.add_columns(priority_score.label("priority"))
+        # Add debugging columns to see what's happening
+        query = query.add_columns(
+            priority_score.label("priority"),
+            days_since_creation.label("debug_days_since_creation"),
+            days_since_last.label("debug_days_since_last"),
+            success_rate.label("debug_success_rate"),
+            latest_tracking.c.total_attempts.label("debug_total_attempts"),
+        )
 
-        # Order by priority (highest first), then by creation date
-        query = query.order_by(
-            priority_score.desc(), VocabRecord.created_at.asc()
-        ).limit(limit)
+        # Order by priority (highest first)
+        query = query.order_by(priority_score.desc()).limit(limit)
 
         results = []
         for (
@@ -356,11 +376,29 @@ class Database:
             last_attempt_date,
             correct_attempts,
             priority,
+            debug_days_since_creation,
+            debug_days_since_last,
+            debug_success_rate,
+            debug_total_attempts,
         ) in query.all():
             vocab_word = VocabWord(
                 word_in_target_language=record.vocab_word_target,
                 word_in_native_language=record.vocab_word_native,
             )
+
+            # Debug logging for each word
+            logfire.info(
+                f"Vocab word debug info: {vocab_word.word_in_target_language}",
+                word=vocab_word.word_in_target_language,
+                created_at=record.created_at,
+                attempts_count=attempts_count,
+                priority=priority,
+                debug_days_since_creation=debug_days_since_creation,
+                debug_days_since_last=debug_days_since_last,
+                debug_success_rate=debug_success_rate,
+                debug_total_attempts=debug_total_attempts,
+            )
+
             results.append(
                 (
                     vocab_word,
@@ -375,7 +413,8 @@ class Database:
             f"Retrieved {len(results)} vocab words for spaced repetition",
             user_id=onboarding_data.id,
             target_language=onboarding_data.target_language,
-            results=results,
+            results_count=len(results),
+            current_time=now,
         )
 
         return results
