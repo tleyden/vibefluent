@@ -655,14 +655,23 @@ class RealtimeAudioConversationAgent:
     async def _process_vocab_drill_result(self, data):
         arguments = json.loads(data.get("arguments", "{}"))
         drill_word_target_language = arguments.get("drill_word_target_language", "")
-        drill_score = arguments.get("drill_score", False)
+        drill_score: bool = arguments.get("drill_score", False)
         logfire.info(
             f"Processing vocab drill result. Pass/fail: {drill_score} for word: {drill_word_target_language}",
             drill_word_target_language=drill_word_target_language,
             drill_score=drill_score,
         )
 
+        if not self.db:
+            raise RuntimeError("Database connection is not initialized.")
+
         # TODO: update the DB with the result of the vocab drill
+        await self.db.save_vocab_drill_result_async(
+            vocab_word_target_language=drill_word_target_language,
+            native_language=self.onboarding_data.native_language,
+            target_language=self.onboarding_data.target_language,
+            passed=drill_score,
+        )
 
         await self._create_response_keep_conversation_going()
 

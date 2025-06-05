@@ -1,12 +1,20 @@
-from sqlalchemy import create_engine, Column, String, Integer, DateTime
+from sqlalchemy import (
+    create_engine,
+    Column,
+    String,
+    Integer,
+    DateTime,
+    Boolean,
+    ForeignKey,
+)
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, relationship
 from typing import List
 from datetime import datetime
-from models import VocabWord
 import asyncio
 import concurrent.futures
-
+from models import VocabWord
+import logfire
 
 Base = declarative_base()
 
@@ -32,6 +40,21 @@ class VocabRecord(Base):
     vocab_word_native = Column(String, nullable=False)
     vocab_word_target = Column(String, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationship to tracking records
+    tracking_records = relationship("VocabTracking", back_populates="vocab_record")
+
+
+class VocabTracking(Base):
+    __tablename__ = "vocab_tracking"
+
+    id = Column(Integer, primary_key=True)
+    vocab_record_id = Column(Integer, ForeignKey("vocab.id"), nullable=False)
+    drill_date = Column(DateTime, default=datetime.utcnow, nullable=False)
+    result = Column(Boolean, nullable=False)  # True for pass, False for fail
+
+    # Relationship back to vocab record
+    vocab_record = relationship("VocabRecord", back_populates="tracking_records")
 
 
 class Database:
@@ -101,7 +124,7 @@ class Database:
         """Save vocabulary words to the vocab table."""
         for vocab_word in vocab_words:
             # Check if this vocab pair already exists
-            existing = (
+            existing_record = (
                 self.session.query(VocabRecord)
                 .filter_by(
                     native_language=native_language,
@@ -112,56 +135,107 @@ class Database:
                 .first()
             )
 
-            # Only add if it doesn't already exist
-            if not existing:
-                vocab_record = VocabRecord(
+            if not existing_record:
+                # Create new record
+                record = VocabRecord(
                     native_language=native_language,
                     target_language=target_language,
                     vocab_word_native=vocab_word.word_in_native_language,
                     vocab_word_target=vocab_word.word_in_target_language,
                 )
-                self.session.add(vocab_record)
+                self.session.add(record)
 
         self.session.commit()
 
-
-    def get_all_vocab_words(self, onboarding_data, limit: int = 20) -> List:
-        """Get all vocabulary words as VocabWord instances for the user's language pair."""
-        from models import VocabWord
-
-        records = (
-            self.session.query(VocabRecord)
-            .filter_by(
-                native_language=onboarding_data.native_language,
-                target_language=onboarding_data.target_language,
-            )
-            .order_by(VocabRecord.created_at.desc())
-            .limit(limit)
-            .all()
+    def get_all_vocab_words(
+        self, onboarding_data, limit: int = None
+    ) -> List[VocabWord]:
+        """Get all vocabulary words for the given language pair."""
+        query = self.session.query(VocabRecord).filter_by(
+            native_language=onboarding_data.native_language,
+            target_language=onboarding_data.target_language,
         )
 
-        vocab_words = []
-        for record in records:
-            vocab_word = VocabWord(
+        if limit:
+            query = query.limit(limit)
+
+        records = query.all()
+
+        return [
+            VocabWord(
                 word_in_target_language=record.vocab_word_target,
                 word_in_native_language=record.vocab_word_native,
             )
-            vocab_words.append(vocab_word)
+            for record in records
+        ]
 
-        return vocab_words
+    async def save_vocab_drill_result_async(
+        self,
+        vocab_word_target_language: str,
+        native_language: str,
+        target_language: str,
+        passed: bool,
+    ):
+        """Async version of save_vocab_words that doesn't block the event loop."""
+        loop = asyncio.get_event_loop()
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            await loop.run_in_executor(
+                executor,
+                self.save_vocab_drill_result,
+                vocab_word_target_language,
+                native_language,
+                target_language,
+                passed
+            )
 
-    def close(self):
-        """Close database session."""
-        self.session.close()
+    def save_vocab_drill_result(
+        self,
+        vocab_word_target_language: str,
+        native_language: str,
+        target_language: str,
+        passed: bool,
+    ) -> None:
+        """Save the result of a vocabulary drill."""
+
+        logfire.info(
+            f"Attempting to save drill result for {vocab_word_target_language} - Did it pass: {passed}"
+        )
+
+        # Find the corresponding vocab record
+        vocab_record = (
+            self.session.query(VocabRecord)
+            .filter_by(
+                native_language=native_language,
+                target_language=target_language,
+                vocab_word_target=vocab_word_target_language,
+            )
+            .first()
+        )
+
+        if vocab_record:
+            logfire.info(
+                f"Saving drill result for {vocab_word_target_language} - Did it pass: {passed}"
+            )
+            # Create tracking record
+            tracking_record = VocabTracking(
+                vocab_record_id=vocab_record.id,
+                result=passed,
+            )
+            self.session.add(tracking_record)
+            self.session.commit()
+        else:
+            logfire.warning(
+                f"Could not find vocab record for {vocab_word_target_language}.  Ignoring drill result."
+            )
 
 
 # Global database instance
-_db_instance = None
+_database = None
 
 
 def get_database() -> Database:
     """Get or create database instance."""
-    global _db_instance
-    if _db_instance is None:
-        _db_instance = Database()
-    return _db_instance
+    global _database
+    if _database is None:
+        _database = Database()
+    return _database
