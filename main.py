@@ -7,10 +7,10 @@ from constants import MODE, REALTIME_AUDIO_CONVERSATION, TEXT
 from dotenv import load_dotenv
 import logfire
 from logfire import ConsoleOptions
-import os
 import signal
 import sys
 import argparse
+import os
 
 
 def signal_handler(sig, frame):
@@ -64,7 +64,6 @@ def main():
             send_to_logfire=False,
             service_name=service_name,
             environment=environment,
-            console=True,  # Enable console output for local visibility
         )
 
     # Check if user has completed onboarding
