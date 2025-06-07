@@ -1,5 +1,9 @@
 
-An experimental language teacher that uses a realtime audio interface.  Learn any language 
+An experimental language teacher that uses a realtime audio interface.  
+
+Learn any language, from any native language, simply by vibing with an AI.  
+
+Features:
 
 * Chat in any language you want to learn, using any native language.  For example, you can learn Spanish as a native German speaker.
 * Converse about topics that interest you.
