@@ -3,12 +3,12 @@ An experimental language teacher that uses a realtime audio interface.
 
 Learn any language, from any native language, simply by vibing with an AI.  
 
-Features:
+## Features
 
 * Chat in any language you want to learn, using any native language.  For example, you can learn Spanish as a native German speaker.
 * Converse about topics that interest you.
 * It will automatically record words that you struggle with into a vocabulary database.
-* Get drilled on your vocabulary words using [spaced repetition](https://en.wikipedia.org/wiki/Spaced_repetition#:~:text=Spaced%20repetition%20is%20an%20evidence,exploit%20the%20psychological%20spacing%20effect.)
+* Get drilled on your vocabulary words using [spaced repetition](https://en.wikipedia.org/wiki/Spaced_repetition#:~:text=Spaced%20repetition%20is%20an%20evidence,exploit%20the%20psychological%20spacing%20effect.) - an evidence-based learning technique that has been proven to increase the rate of learning.
 * Since it's completely audio based, enjoy the ability to multi-task!  
 
 Here are the current [list of issues](https://github.com/tleyden/vibefluent/issues) to be aware of.  💸 The [excessive running cost](https://github.com/tleyden/vibefluent/issues/21) in particular. 
