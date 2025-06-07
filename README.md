@@ -66,7 +66,7 @@ uv sync
 cp .env.template .env
 ```
 
-Now open .env and add your OpenAI key.  Ignore the other placeholders, you shouldn't need them.
+Now open `.env` in an editor and add your OpenAI key.  Ignore the other env var placeholders, you shouldn't need them.
 
 
 ## Running VibeFluent
