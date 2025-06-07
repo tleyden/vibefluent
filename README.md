@@ -67,7 +67,7 @@ uv sync
 
 ### Setup OpenAI API key
 
-⚠️ This uses an insane amount of tokens and is **very expensive** to run! ⚠️ 
+⚠️ This uses an insane amount of tokens and is **very expensive** to run! See [Issue 21](https://github.com/tleyden/vibefluent/issues/21) for details ⚠️ 
 
 ⚠️ Don't leave it running and walk away!  You will quickly drain your OpenAI account ⚠️ 
 
