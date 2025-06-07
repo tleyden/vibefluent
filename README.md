@@ -3,7 +3,7 @@ An experimental language teacher that uses a realtime audio interface.
 
 Learn any language, from any native language, simply by vibing with an AI.  
 
-<video src="https://github.com/user-attachments/assets/d7242333-4a22-4239-af99-8dd8f4d1a030" controls="controls" style="max-width: 100%;">
+<video src="https://github.com/user-attachments/assets/e73d427a-a156-4a19-bd3f-e65e5b9f9afb" controls="controls" style="max-width: 100%;">
 </video>
 
 ## Features
