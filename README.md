@@ -3,6 +3,9 @@ An experimental language teacher that uses a realtime audio interface.
 
 Learn any language, from any native language, simply by vibing with an AI.  
 
+<video src="https://github.com/user-attachments/assets/d7242333-4a22-4239-af99-8dd8f4d1a030" controls="controls" style="max-width: 100%;">
+</video>
+
 ## Features
 
 * Chat in any language you want to learn, using any native language.  For example, you can learn Spanish as a native German speaker.
