@@ -86,7 +86,9 @@ Put your 🎧 headphones on, otherwise it won't work.  Then run it:
 python main.py
 ```
 
-It will ask you a few onboarding questions via the CLI interface, and then you should hear it speaking and you can answer it via voice.
+It will ask you a few onboarding questions via the CLI interface.  After finishing the onboarding, you should hear it speaking and you can answer it via voice through your headphones.
+
+![Image](https://github.com/user-attachments/assets/9f69ea11-020f-4fd6-8103-170d15cc27e8)
 
 ## Setting up multiple user profiles
 
