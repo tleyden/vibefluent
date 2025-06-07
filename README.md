@@ -1,11 +1,13 @@
 
-An experimental language teacher that uses a realtime audio interface teach you any language you want to learn.
+An experimental language teacher that uses a realtime audio interface.  Learn any language 
 
 * Chat in any language you want to learn, using any native language.  For example, you can learn Spanish as a native German speaker.
 * Converse about topics that interest you.
 * It will automatically record words that you struggle with into a vocabulary database.
 * Get drilled on your vocabulary words using [spaced repetition](https://en.wikipedia.org/wiki/Spaced_repetition#:~:text=Spaced%20repetition%20is%20an%20evidence,exploit%20the%20psychological%20spacing%20effect.)
 * Since it's completely audio based, enjoy the ability to multi-task!  
+
+Here are the current [list of issues](https://github.com/tleyden/vibefluent/issues) to be aware of.  💸 The [excessive running cost](https://github.com/tleyden/vibefluent/issues/21) in particular. 
 
 ## Requirements
 
@@ -102,3 +104,7 @@ Open `vibefluent.db` in your favorite sqlite UI.
 ## Backstory
 
 This was inspired by [vibelingo](https://github.com/tleyden/vibelingo), which was created at the [SundAI Hack Berlin](https://lu.ma/lhzjraav) in May 2025.
+
+## Roadmap
+
+1. Convert this to WebRTC so it can be used in a desktop or mobile browser
