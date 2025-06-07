@@ -37,10 +37,10 @@ def main():
     load_dotenv()
 
     # Initialize logfire
+    service_name = "vibefluent"
+    environment = "development"
     LOGFIRE_API_KEY = os.environ.get("LOGFIRE_API_KEY", "")
     if LOGFIRE_API_KEY:
-        service_name = "vibefluent"
-        environment = "development"
         if MODE == TEXT:
             logfire.configure(
                 token=LOGFIRE_API_KEY,
@@ -58,6 +58,14 @@ def main():
             )
 
         logfire.info("VibeFluent application started successfully")
+    else:
+        # Configure Logfire for local logging only
+        logfire.configure(
+            send_to_logfire=False,
+            service_name=service_name,
+            environment=environment,
+            console=True,  # Enable console output for local visibility
+        )
 
     # Check if user has completed onboarding
     if args.new_user:
