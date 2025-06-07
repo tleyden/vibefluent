@@ -63,28 +63,23 @@ def main():
     if args.new_user:
         print("Creating new user profile...")
         onboarding_data = run_onboarding()
-        # Reload to get the ID assigned by the database
-        onboarding_data = load_onboarding_data()
         print(f"\nWelcome, {onboarding_data.name}! Onboarding complete.")
         print(f"Ready to help you learn {onboarding_data.target_language}!")
     else:
         onboarding_data = load_onboarding_data()
         if onboarding_data is None:
-            print("No profile selected. Exiting.")
-            return
-
-        if onboarding_data is None:
-            print("Welcome to VibeFluent! Let's get you set up...")
+            print("No profile found. Let's set up your profile first!")
             onboarding_data = run_onboarding()
-            # Reload to get the ID assigned by the database
-            onboarding_data = load_onboarding_data()
-            print(f"\nWelcome, {onboarding_data.name}! Onboarding complete.")
+            print(f"\nWelcome {onboarding_data.name}! Your profile has been saved.")
             print(f"Ready to help you learn {onboarding_data.target_language}!")
         else:
             print(f"Welcome back, {onboarding_data.name}!")
             print(
                 f"Continuing your {onboarding_data.target_language} learning journey..."
             )
+
+    # Reload to get the ID assigned by the database
+    onboarding_data = load_onboarding_data()
 
     logfire.info(
         "Onboarding data loaded",
