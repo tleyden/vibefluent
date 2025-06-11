@@ -166,6 +166,10 @@ def import_vocab_from_google_sheet(
 
         if not vocab_words:
             raise ValueError("No valid vocabulary words found in the sheet")
+        
+        raise RuntimeError(
+            "Dont save to db yet."
+        )
 
         # Save to database
         database = get_database()

@@ -94,35 +94,37 @@ def main():
     # Reload to get the ID assigned by the database
     onboarding_data = load_onboarding_data()
 
+    if not onboarding_data:
+        raise RuntimeError(
+            "Failed to load onboarding data after onboarding. Please try again."
+        )
+
     # Handle vocabulary import if requested
     if args.import_vocab:
-        try:
-            print("Importing vocabulary from Google Sheet...")
-            vocab_count = import_vocab_from_google_sheet(
-                args.import_vocab, onboarding_data
-            )
-            print(f"✅ Successfully imported {vocab_count} vocabulary words!")
+        logfire.info(f"Importing vocabulary from Google Sheet: {args.import_vocab}")
+        vocab_count = import_vocab_from_google_sheet(
+            args.import_vocab, onboarding_data
+        )
+        print(f"✅ Successfully imported {vocab_count} vocabulary words!")
 
-            # Ask user if they want to continue or exit
-            while True:
-                choice = (
-                    input(
-                        "\nWould you like to continue with the conversation (c) or exit (e)? "
-                    )
-                    .lower()
-                    .strip()
+        # Ask user if they want to continue or exit
+        while True:
+            choice = (
+                input(
+                    "\nWould you like to continue with the conversation (c) or exit (e)? "
                 )
-                if choice in ["c", "continue"]:
-                    print("Continuing to conversation...")
-                    break
-                elif choice in ["e", "exit"]:
-                    print("Goodbye! Your vocabulary has been saved.")
-                    sys.exit(0)
-                else:
-                    print("Please enter 'c' for continue or 'e' for exit.")
-        except Exception as e:
-            print(f"❌ Failed to import vocabulary: {str(e)}")
-            print("Continuing without import...")
+                .lower()
+                .strip()
+            )
+            if choice in ["c", "continue"]:
+                print("Continuing to conversation...")
+                break
+            elif choice in ["e", "exit"]:
+                print("Goodbye! Your vocabulary has been saved.")
+                sys.exit(0)
+            else:
+                print("Please enter 'c' for continue or 'e' for exit.")
+
 
     logfire.info(
         "Onboarding data loaded",
