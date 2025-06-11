@@ -88,6 +88,11 @@ def main():
     # Reload to get the ID assigned by the database
     onboarding_data = load_onboarding_data()
 
+    # If the user gave the argument --import-vocab then import vocab words from a google
+    # sheet, show a message with the number of words imported and ask the user if they want to 
+    # continue or exit. 
+    
+
     logfire.info(
         "Onboarding data loaded",
         onboarding_data=onboarding_data,
