@@ -11,6 +11,7 @@ import signal
 import sys
 import argparse
 import os
+from vocab_import import import_vocab_from_google_sheet
 
 
 def signal_handler(sig, frame):
@@ -28,6 +29,11 @@ def main():
         "--new-user",
         action="store_true",
         help="Force onboarding of a new user regardless of existing users",
+    )
+    parser.add_argument(
+        "--import-vocab",
+        type=str,
+        help="Import vocabulary from Google Sheets URL",
     )
     args = parser.parse_args()
 
@@ -88,10 +94,35 @@ def main():
     # Reload to get the ID assigned by the database
     onboarding_data = load_onboarding_data()
 
-    # If the user gave the argument --import-vocab then import vocab words from a google
-    # sheet, show a message with the number of words imported and ask the user if they want to 
-    # continue or exit. 
-    
+    # Handle vocabulary import if requested
+    if args.import_vocab:
+        try:
+            print("Importing vocabulary from Google Sheet...")
+            vocab_count = import_vocab_from_google_sheet(
+                args.import_vocab, onboarding_data
+            )
+            print(f"✅ Successfully imported {vocab_count} vocabulary words!")
+
+            # Ask user if they want to continue or exit
+            while True:
+                choice = (
+                    input(
+                        "\nWould you like to continue with the conversation (c) or exit (e)? "
+                    )
+                    .lower()
+                    .strip()
+                )
+                if choice in ["c", "continue"]:
+                    print("Continuing to conversation...")
+                    break
+                elif choice in ["e", "exit"]:
+                    print("Goodbye! Your vocabulary has been saved.")
+                    sys.exit(0)
+                else:
+                    print("Please enter 'c' for continue or 'e' for exit.")
+        except Exception as e:
+            print(f"❌ Failed to import vocabulary: {str(e)}")
+            print("Continuing without import...")
 
     logfire.info(
         "Onboarding data loaded",
