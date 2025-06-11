@@ -160,6 +160,46 @@ class Database:
 
         self.session.commit()
 
+    def save_vocab_words_for_user(
+        self, vocab_words: List[VocabWord], onboarding_data: OnboardingData
+    ) -> None:
+        """Save vocabulary words for a specific user."""
+        if onboarding_data.id is None:
+            logfire.warning(
+                "OnboardingData has no ID. Cannot save vocab words without user ID."
+            )
+            return
+
+        for vocab_word in vocab_words:
+            # Check if this vocab pair already exists for this user
+            existing_record = (
+                self.session.query(VocabRecord)
+                .filter_by(
+                    onboarding_record_id=onboarding_data.id,
+                    vocab_word_native=vocab_word.word_in_native_language,
+                    vocab_word_target=vocab_word.word_in_target_language,
+                )
+                .first()
+            )
+
+            if not existing_record:
+                # Create new record
+                record = VocabRecord(
+                    onboarding_record_id=onboarding_data.id,
+                    native_language=onboarding_data.native_language,
+                    target_language=onboarding_data.target_language,
+                    vocab_word_native=vocab_word.word_in_native_language,
+                    vocab_word_target=vocab_word.word_in_target_language,
+                )
+                self.session.add(record)
+
+        self.session.commit()
+        logfire.info(
+            f"Saved {len(vocab_words)} vocab words for user {onboarding_data.name}",
+            user_id=onboarding_data.id,
+            vocab_count=len(vocab_words),
+        )
+
     def get_all_vocab_words(
         self, onboarding_data: OnboardingData, limit: int = None
     ) -> List[VocabWord]:
