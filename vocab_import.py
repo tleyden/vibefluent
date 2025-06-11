@@ -109,20 +109,28 @@ def extract_vocab_words_from_sheet(
     vocab_words = []
 
     for _, row in df.iterrows():
-        native_word = str(row[native_col]).strip()
-        target_word = str(row[target_col]).strip()
+        # Get values and handle potential NaN/None values
+        native_word = row[native_col]
+        target_word = row[target_col]
+
+        # Convert to string and check for empty/invalid values
+        native_word_str = str(native_word).strip() if pd.notna(native_word) else ""
+        target_word_str = str(target_word).strip() if pd.notna(target_word) else ""
 
         # Skip empty or invalid entries
         if (
-            native_word
-            and target_word
-            and native_word.lower() not in ["nan", "none", ""]
-            and target_word.lower() not in ["nan", "none", ""]
+            not native_word_str
+            or not target_word_str
+            or native_word_str.lower() in ["nan", "none", ""]
+            or target_word_str.lower() in ["nan", "none", ""]
         ):
-            vocab_word = VocabWord(
-                word_in_native_language=native_word, word_in_target_language=target_word
-            )
-            vocab_words.append(vocab_word)
+            continue
+
+        vocab_word = VocabWord(
+            word_in_native_language=native_word_str,
+            word_in_target_language=target_word_str,
+        )
+        vocab_words.append(vocab_word)
 
     return vocab_words
 
