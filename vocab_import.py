@@ -164,12 +164,15 @@ def import_vocab_from_google_sheet(
         # Extract vocabulary words
         vocab_words = extract_vocab_words_from_sheet(df, native_col, target_col)
 
+        logfire.info(
+            f"Extracted {len(vocab_words)} vocabulary words from the sheet",
+            vocab_words=vocab_words[:50],  # Log first 10 words for brevity
+        )
+
         if not vocab_words:
             raise ValueError("No valid vocabulary words found in the sheet")
-        
-        raise RuntimeError(
-            "Dont save to db yet."
-        )
+
+        raise RuntimeError("Dont save to db yet.")
 
         # Save to database
         database = get_database()
