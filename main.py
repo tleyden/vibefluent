@@ -78,6 +78,7 @@ def main():
         onboarding_data = run_onboarding()
         print(f"\nWelcome, {onboarding_data.name}! Onboarding complete.")
         print(f"Ready to help you learn {onboarding_data.target_language}!")
+
     else:
         onboarding_data = load_onboarding_data()
         if onboarding_data is None:
@@ -91,9 +92,6 @@ def main():
                 f"Continuing your {onboarding_data.target_language} learning journey..."
             )
 
-    # Reload to get the ID assigned by the database
-    onboarding_data = load_onboarding_data()
-
     if not onboarding_data:
         raise RuntimeError(
             "Failed to load onboarding data after onboarding. Please try again."
@@ -102,9 +100,7 @@ def main():
     # Handle vocabulary import if requested
     if args.import_vocab:
         logfire.info(f"Importing vocabulary from Google Sheet: {args.import_vocab}")
-        vocab_count = import_vocab_from_google_sheet(
-            args.import_vocab, onboarding_data
-        )
+        vocab_count = import_vocab_from_google_sheet(args.import_vocab, onboarding_data)
         print(f"✅ Successfully imported {vocab_count} vocabulary words!")
 
         # Ask user if they want to continue or exit
@@ -124,7 +120,6 @@ def main():
                 sys.exit(0)
             else:
                 print("Please enter 'c' for continue or 'e' for exit.")
-
 
     logfire.info(
         "Onboarding data loaded",

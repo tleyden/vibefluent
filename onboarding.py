@@ -142,15 +142,15 @@ def load_onboarding_data() -> Optional[OnboardingData]:
                 )
 
 
-def save_onboarding_data(data: OnboardingData) -> None:
+def save_onboarding_data(data: OnboardingData) -> OnboardingData:
     """Save onboarding data to SQLite database."""
     db = get_database()
-    db.save_onboarding_data(data)
+    return db.save_onboarding_data(data)
 
 
 def run_onboarding() -> OnboardingData:
     """Run the onboarding process using curses."""
     ui = OnboardingUI()
     data = curses.wrapper(ui.run)
-    save_onboarding_data(data)
-    return data
+    saved_data = save_onboarding_data(data)
+    return saved_data

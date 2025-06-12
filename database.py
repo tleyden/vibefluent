@@ -74,7 +74,7 @@ class Database:
         Session = sessionmaker(bind=self.engine)
         self.session = Session()
 
-    def save_onboarding_data(self, onboarding_data) -> None:
+    def save_onboarding_data(self, onboarding_data) -> OnboardingData:
         """Save onboarding data in SQLite without deleting existing records."""
         # Create new record without deleting existing ones
         record = OnboardingRecord(
@@ -88,6 +88,17 @@ class Database:
 
         self.session.add(record)
         self.session.commit()
+
+        # Return OnboardingData with the database-assigned ID
+        return OnboardingData(
+            id=record.id,
+            name=record.name,
+            native_language=record.native_language,
+            target_language=record.target_language,
+            conversation_interests=record.conversation_interests,
+            target_language_level=record.target_language_level,
+            reason_for_learning=record.reason_for_learning,
+        )
 
     def load_onboarding_data(self):
         """Load onboarding data from SQLite."""
